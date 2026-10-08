@@ -1,0 +1,1554 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>חוסן בזמן אמת – מניעת אובדנות</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Heebo',sans-serif;direction:rtl;background:radial-gradient(ellipse at 60% 20%,#c7d9f0,#dce8f5 40%,#b8cfe8);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;}
+
+/* Phone shell */
+.phone-shell{position:relative;width:390px;flex-shrink:0;border-radius:52px;background:linear-gradient(160deg,#2a2a2e,#1a1a1e 40%,#111114);box-shadow:0 0 0 1px #555,0 0 0 2px #222,inset 0 1px 0 rgba(255,255,255,.08),0 40px 80px rgba(0,0,0,.55);padding:12px;}
+.phone-btn{position:absolute;background:linear-gradient(180deg,#3a3a3e,#2a2a2e);}
+.phone-btn-vol1{left:-3px;top:158px;width:3px;height:34px;border-radius:2px 0 0 2px;}
+.phone-btn-vol2{left:-3px;top:202px;width:3px;height:34px;border-radius:2px 0 0 2px;}
+.phone-btn-silent{left:-3px;top:108px;width:3px;height:26px;border-radius:2px 0 0 2px;}
+.phone-btn-power{right:-3px;top:172px;width:3px;height:66px;border-radius:0 2px 2px 0;}
+.phone-screen{width:100%;border-radius:42px;overflow:hidden;background:#f0ece6;position:relative;aspect-ratio:390/844;}
+
+/* Dynamic Island */
+.dynamic-island{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:122px;height:35px;background:#0a0a0a;border-radius:18px;z-index:100;display:flex;align-items:center;justify-content:center;gap:22px;}
+.di-camera{width:11px;height:11px;border-radius:50%;background:#1a1a1a;border:1px solid #2a2a2a;}
+.di-sensor{width:7px;height:7px;border-radius:50%;background:#111;border:2px solid #222;}
+
+/* Status bar */
+.status-bar{position:absolute;top:0;left:0;right:0;height:56px;z-index:99;display:flex;align-items:flex-start;justify-content:space-between;padding:14px 26px 0;pointer-events:none;}
+.status-time{font-size:15px;font-weight:600;color:#1a1a1a;font-family:sans-serif;letter-spacing:-.3px;}
+.status-icons{display:flex;align-items:center;gap:5px;margin-top:2px;}
+
+/* Home indicator */
+.home-indicator{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:130px;height:4px;background:rgba(0,0,0,.2);border-radius:3px;z-index:100;}
+
+/* App wrapper */
+.app-wrap{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden;}
+
+/* Top bar */
+.top-bar{padding:60px 16px 12px;background:rgba(240,236,230,.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(0,0,0,.08);flex-shrink:0;position:sticky;top:0;z-index:50;}
+.top-bar-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.app-logo{display:flex;align-items:center;gap:10px;}
+.app-icon{width:44px;height:44px;background:linear-gradient(135deg,#1a1a2e,#2d2d44);border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.app-title{font-size:22px;font-weight:900;color:#1a1a2e;line-height:1.1;}
+.app-sub{font-size:11px;color:#888;font-weight:500;margin-top:1px;}
+.wa-btn{width:40px;height:40px;background:linear-gradient(135deg,#25D366,#128C7E);border-radius:14px;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;position:relative;flex-shrink:0;}
+.wa-dot{position:absolute;top:-3px;right:-3px;width:12px;height:12px;background:#ef4444;border-radius:50%;border:2px solid #f0ece6;}
+
+/* Disclaimer (Highly Emphasized) */
+.disclaimer{background:linear-gradient(135deg, #fff5f5, #ffe4e6);border-radius:12px;padding:12px;font-size:12px;color:#9f1239;line-height:1.5;border:1.5px solid #fda4af;text-align:center;box-shadow:0 4px 12px rgba(225,29,72,0.15);}
+.disclaimer strong{color:#881337;font-weight:900;display:block;font-size:13px;margin-bottom:2px;}
+
+/* Search bar */
+.search-bar{display:flex;align-items:center;gap:8px;background:#fff;border-radius:12px;border:1.5px solid #e2e8f0;padding:8px 12px;margin-top:10px;transition:border-color .2s;}
+.search-bar:focus-within{border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,.1);}
+.search-bar svg{flex-shrink:0;color:#94a3b8;}
+.search-input{flex:1;border:none;outline:none;font-family:'Heebo',sans-serif;font-size:13px;font-weight:500;color:#1a1a2e;background:transparent;direction:rtl;}
+.search-input::placeholder{color:#94a3b8;}
+.search-clear{background:none;border:none;cursor:pointer;color:#94a3b8;font-size:16px;line-height:1;padding:0 2px;display:none;}
+.search-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:#f0ece6;z-index:40;overflow-y:auto;padding:8px 14px 100px;}
+.search-result{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border-radius:12px;border:1px solid #eee;margin-bottom:6px;cursor:pointer;transition:all .15s;text-decoration:none;}
+.search-result:active{background:#f5f5f5;}
+.search-tag{font-size:9px;font-weight:900;padding:2px 7px;border-radius:6px;flex-shrink:0;margin-top:2px;}
+.search-result-title{font-size:12px;font-weight:900;color:#1a1a2e;line-height:1.3;}
+.search-result-sub{font-size:10px;color:#888;margin-top:1px;}
+.search-highlight{background:#fef9c3;border-radius:2px;font-weight:900;}
+.search-empty{text-align:center;padding:30px 20px;color:#94a3b8;font-size:13px;font-weight:500;}
+
+/* Scroll area */
+.scroll-area{flex:1;overflow-y:auto;padding:12px 14px 110px;scroll-behavior:smooth;}
+.scroll-area::-webkit-scrollbar{display:none;}
+
+/* Bottom nav */
+.bottom-nav{position:absolute;bottom:22px;left:8px;right:8px;z-index:60;}
+.nav-inner{background:rgba(255,255,255,.97);backdrop-filter:blur(24px);border-radius:26px;padding:8px 2px;display:flex;align-items:center;justify-content:space-between;border:1px solid rgba(255,255,255,.95);box-shadow:0 4px 24px rgba(0,0,0,.15);}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2px 0;background:none;border:none;cursor:pointer;border-radius:12px;transition:all .2s;}
+.nav-btn:active{transform:scale(.92);}
+.nav-btn-icon{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:10px;transition:all .2s;}
+.nav-btn-icon svg{width:18px;height:18px;transition:all .2s;}
+.nav-btn-label{font-size:9.5px;font-weight:900;margin-top:3px;transition:all .2s;letter-spacing:-.2px;color:#475569;}
+
+/* צבע לכל כפתור - לא פעיל */
+#tab-rules .nav-btn-icon svg, #tab-docs .nav-btn-icon svg, #tab-prevention .nav-btn-icon svg, #tab-qpr .nav-btn-icon svg, #tab-signs .nav-btn-icon svg, #tab-checklist .nav-btn-icon svg, #tab-navigator .nav-btn-icon svg {stroke:#64748b;}
+#tab-rules .nav-btn-label, #tab-docs .nav-btn-label, #tab-prevention .nav-btn-label, #tab-qpr .nav-btn-label, #tab-signs .nav-btn-label, #tab-checklist .nav-btn-label, #tab-navigator .nav-btn-label {color:#475569;}
+
+/* פעיל - כל כפתור בצבע ייחודי */
+#tab-rules.active .nav-btn-icon{background:linear-gradient(135deg,#6d28d9,#4f46e5);}
+#tab-rules.active .nav-btn-icon svg{stroke:white;}
+#tab-rules.active .nav-btn-label{color:#6d28d9;}
+
+#tab-docs.active .nav-btn-icon{background:linear-gradient(135deg,#0369a1,#0284c7);}
+#tab-docs.active .nav-btn-icon svg{stroke:white;}
+#tab-docs.active .nav-btn-label{color:#0369a1;}
+
+#tab-qpr.active .nav-btn-icon{background:linear-gradient(135deg,#312e81,#4338ca);}
+#tab-qpr.active .nav-btn-icon svg{stroke:white;}
+#tab-qpr.active .nav-btn-label{color:#312e81;}
+
+#tab-signs.active .nav-btn-icon{background:linear-gradient(135deg,#b45309,#f59e0b);}
+#tab-signs.active .nav-btn-icon svg{stroke:white;}
+#tab-signs.active .nav-btn-label{color:#b45309;}
+
+#tab-checklist.active .nav-btn-icon{background:linear-gradient(135deg,#15803d,#22c55e);}
+#tab-checklist.active .nav-btn-icon svg{stroke:white;}
+#tab-checklist.active .nav-btn-label{color:#15803d;}
+
+#tab-prevention.active .nav-btn-icon{background:linear-gradient(135deg,#15803d,#22c55e);}
+#tab-prevention.active .nav-btn-icon svg{stroke:white;}
+#tab-prevention.active .nav-btn-label{color:#15803d;}
+
+#tab-navigator.active .nav-btn-icon{background:linear-gradient(135deg,#be123c,#e11d48);}
+#tab-navigator.active .nav-btn-icon svg{stroke:white;}
+#tab-navigator.active .nav-btn-label{color:#be123c;}
+
+/* כפתור מרכזי - בית */
+.nav-center{flex:1.2;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;position:relative;cursor:pointer;gap:0;height:100%;padding-bottom:2px;}
+.nav-center-circle{width:50px;height:50px;border-radius:50%;background:linear-gradient(135deg,#4f46e5,#7c3aed);display:flex;align-items:center;justify-content:center;border:4px solid rgba(240,236,230,.98);box-shadow:0 6px 16px rgba(79,70,229,.4);position:absolute;top:-24px;z-index:2;transition:all .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
+.nav-center-circle svg{width:22px;height:22px;}
+.nav-center-label{font-size:10px;font-weight:900;color:#475569;transition:all .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);z-index:1;}
+.nav-center.home-active .nav-center-circle{transform:scale(1.1);background:linear-gradient(135deg,#3730a3,#5b21b6);box-shadow:0 8px 20px rgba(79,70,229,.6);}
+.nav-center.home-active .nav-center-label{color:#4f46e5; transform:scale(1.05) translateY(-1px);}
+
+/* Cards */
+.card{background:#fff;border-radius:16px;border:1px solid rgba(0,0,0,.07);overflow:hidden;margin-bottom:10px;}
+.card-header{padding:12px 14px;display:flex;align-items:center;gap:10px;}
+.card-body{padding:12px 14px;border-top:1px solid #f0f0f0;}
+.section-title{font-size:22px;font-weight:900;color:#1a1a2e;margin:18px 0 12px;}
+
+/* Emergency btn */
+.emg-btn{width:100%;border-radius:16px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;margin-bottom:10px;animation:emg-pulse 2.5s ease-in-out infinite;}
+@keyframes emg-pulse{0%,100%{box-shadow:0 0 0 0 rgba(192,57,43,.5),0 6px 20px rgba(192,57,43,.3);}50%{box-shadow:0 0 0 6px rgba(192,57,43,0),0 6px 20px rgba(192,57,43,.3);}}
+.emg-left{display:flex;align-items:center;gap:10px;}
+.emg-icon{width:38px;height:38px;background:rgba(255,255,255,.2);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.emg-title{font-size:15px;font-weight:900;text-align:right;line-height:1.2;}
+.emg-sub{font-size:11px;color:rgba(255,255,255,.8);margin-top:2px;text-align:right;}
+
+/* Scenario tiles */
+.tiles-box{background:rgba(255,255,255,.65);border-radius:16px;padding:10px;border:1px solid rgba(255,255,255,.9);margin-bottom:10px;}
+.tiles-label{font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase;letter-spacing:.05em;padding:2px 4px 8px;}
+.tile-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:12px;border:none;cursor:pointer;margin-bottom:6px;text-align:right;transition:opacity .15s;}
+.tile-btn:last-child{margin-bottom:0;}
+.tile-btn:active{opacity:.8;}
+.tile-left{display:flex;align-items:center;gap:10px;}
+.tile-num{font-size:14px;font-weight:900;width:28px;flex-shrink:0;}
+.tile-text{font-size:14px;font-weight:900;color:#1a1a2e;line-height:1.2;}
+.tile-sub{font-size:11px;color:#666;margin-top:2px;}
+
+/* Quick buttons */
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.quick-btn{display:flex;align-items:center;gap:8px;padding:12px 10px;border-radius:12px;border:none;cursor:pointer;text-align:right;}
+.quick-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.quick-label{font-size:12px;font-weight:900;line-height:1.3;}
+
+/* Info row */
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:12px;background:rgba(255,255,255,.9);border:1px solid rgba(0,0,0,.07);margin-bottom:10px;cursor:pointer;text-decoration:none;}
+.info-left{display:flex;align-items:center;gap:10px;}
+.info-icon{width:32px;height:32px;background:#e8e4ff;border-radius:8px;display:flex;align-items:center;justify-content:center;}
+.info-title{font-size:13px;font-weight:900;color:#1a1a2e;}
+.info-sub{font-size:11px;color:#666;margin-top:1px;}
+
+/* Professional reminder */
+.pro-reminder{border-radius:12px;padding:12px;border:1px solid #e8e0d0;background:#f7f4ef;margin-bottom:10px;}
+.pro-dot{display:flex;align-items:center;gap:6px;margin-bottom:6px;}
+.pro-text{font-size:12px;color:#444;line-height:1.6;font-weight:700;}
+.pro-date{font-size:10px;color:#888;margin-top:6px;}
+
+/* Navigator */
+.nav-header{display:flex;align-items:center;justify-content:space-between;background:#fff;padding:12px 14px;border-radius:14px;margin-bottom:10px;border:1px solid #eee;}
+.back-btn{width:34px;height:34px;background:#f5f5f5;border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.nav-title{font-size:17px;font-weight:900;color:#1a1a2e;}
+
+.alert-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;gap:10px;}
+.alert-icon{flex-shrink:0;margin-top:2px;}
+.alert-title{font-size:13px;font-weight:900;color:#92400e;margin-bottom:4px;}
+.alert-text{font-size:12px;color:#92400e;font-weight:500;line-height:1.5;}
+
+.procedure-desc{background:#fff;border-radius:12px;padding:14px;font-size:13px;color:#444;line-height:1.6;margin-bottom:16px;font-weight:500;border:1px solid #e2e8f0;}
+
+.action-btn{width:100%;padding:14px;background:linear-gradient(135deg,#4f46e5,#7c3aed);color:#fff;font-size:14px;font-weight:900;border:none;border-radius:12px;cursor:pointer;margin-top:10px;font-family:'Heebo',sans-serif;letter-spacing:.02em;}
+.action-btn:active{opacity:.9;}
+
+/* QPR Update */
+.qpr-step{border-radius:16px;border:1px solid #e0e0e0;overflow:hidden;margin-bottom:14px;background:#fff;}
+.qpr-head{display:flex;align-items:center;justify-content:space-between;padding:16px 14px;}
+.qpr-letter{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:#fff;flex-shrink:0;}
+.qpr-step-num{font-size:11px;font-weight:900;color:#fff;padding:4px 12px;border-radius:14px;}
+.qpr-goal{padding:12px 14px;font-size:13px;color:#444;font-weight:700;text-align:center;border-top:1px solid rgba(0,0,0,0.05);border-bottom:1px solid #f0f0f0;}
+.qpr-section-btn{width:100%;display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:none;border:none;border-bottom:1px solid #f5f5f5;cursor:pointer;font-family:'Heebo',sans-serif;}
+.qpr-section-label{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:900;color:#1a1a2e;}
+.qpr-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.qpr-content{padding:12px 16px;font-size:13px;line-height:1.6;}
+.qpr-item{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;color:#333;font-weight:700;}
+.qpr-item::before{content:"•";color:inherit;font-weight:900;flex-shrink:0;}
+.chevron{font-size:14px;color:#888;transition:transform .2s;}
+.chevron.open{transform:rotate(180deg);}
+
+/* Rules tab */
+.rule-card{background:#fff;border-radius:14px;padding:14px;border-left:none;border:1px solid #eee;margin-bottom:10px;display:flex;gap:12px;position:relative;overflow:hidden;}
+.rule-stripe{position:absolute;right:0;top:0;bottom:0;width:4px;}
+.rule-icon-wrap{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.rule-title{font-size:15px;font-weight:900;color:#1a1a2e;margin-bottom:4px;}
+.rule-desc{font-size:13px;color:#444;line-height:1.5;font-weight:500;}
+.rule-desc strong{color:#b91c1c; font-weight:900;}
+
+/* Signs tab */
+.verbal-card{background:linear-gradient(135deg,#fdf0ff,#f5e8ff);border-radius:14px;padding:14px;border:1px solid #e0c0f0;margin-bottom:10px;}
+.verbal-quote{background:rgba(255,255,255,.9);border-radius:10px;padding:10px 12px;font-size:13px;font-weight:900;color:#4c1d95;margin-bottom:6px;}
+
+/* Docs tab */
+.doc-btn{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;border:1px solid;margin-bottom:10px;text-decoration:none;transition:opacity .15s;}
+.doc-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.doc-title{font-size:14px;font-weight:900;}
+
+/* Checklist / Procedure Checkbox tab */
+.scenario-grid{display:grid;grid-template-columns:repeat(3, 1fr);gap:8px;margin-bottom:16px;}
+.scenario-btn{background:#fff;border:1.5px solid #e2e8f0;border-radius:10px;padding:10px 4px;font-weight:700;color:#64748b;font-size:11.5px;cursor:pointer;text-align:center;line-height:1.3;transition:all .2s;font-family:'Heebo',sans-serif;}
+.scenario-btn.active{background:#15803d;color:#fff;border-color:#15803d;}
+
+.cl-progress{background:#f1f5f9;border-radius:12px;padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.cl-progress-text{font-size:14px;font-weight:900;color:#334155;min-width:36px;text-align:left;direction:ltr;}
+.cl-progress-bar-wrap{flex:1;height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;order:2;}
+.cl-progress-bar{height:100%;background:linear-gradient(90deg,#16a34a,#22c55e);border-radius:3px;transition:width .3s ease;}
+
+.cl-section{margin-bottom:20px;}
+.cl-section-title{font-size:13px;font-weight:900;color:#64748b;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+
+.cl-item-row{background:#fff;border:1.5px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:all .2s;position:relative;}
+.cl-item-row.is-warn{background:#fffdf5;border-color:#fcd34d;}
+.cl-item-row.is-checked{background:#f0fdf4;border-color:#86efac;}
+
+.cl-item-text-col{flex:1;padding-left:12px;text-align:right;}
+.cl-warn-badge{display:inline-flex;align-items:center;gap:4px;background:#fef3c7;color:#92400e;font-size:10px;font-weight:900;padding:2px 6px;border-radius:4px;margin-bottom:6px;}
+.cl-item-title{font-size:13px;font-weight:700;color:#1e293b;line-height:1.4;}
+.cl-item-row.is-checked .cl-item-title{color:#15803d;}
+
+.cl-item-checkbox{width:24px;height:24px;border-radius:6px;border:2px solid #cbd5e1;background:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.cl-item-row.is-warn .cl-item-checkbox{border-color:#f59e0b;}
+.cl-item-row.is-checked .cl-item-checkbox{background:#22c55e;border-color:#22c55e;}
+
+.checklist-title{font-size:12px;font-weight:900;color:#64748b;margin-bottom:8px;}
+
+/* Modal for Document Previews */
+.doc-modal-overlay{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;}
+.doc-modal{background:#fff;width:100%;max-height:85%;border-radius:20px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.3);transform:translateY(20px);opacity:0;transition:all .3s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
+.doc-modal.show{transform:translateY(0);opacity:1;}
+.doc-modal-header{padding:14px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.doc-modal-title{font-size:15px;font-weight:900;color:#1e293b;}
+.doc-modal-close{width:30px;height:30px;background:#e2e8f0;border:none;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.doc-modal-body{padding:16px;overflow-y:auto;font-size:13px;line-height:1.6;color:#334155;flex:1;}
+
+/* Toast */
+.toast-container{position:absolute;top:68px;left:12px;right:12px;z-index:200;pointer-events:none;}
+.toast{background:#1a1a2e;color:#fff;border-radius:12px;padding:12px 16px;margin-bottom:8px;font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px;transform:translateY(-8px);opacity:0;transition:all .25s ease;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,.25);}
+.toast.show{transform:translateY(0);opacity:1;}
+.toast.warn{background:#854d0e;color:#fff;border-radius:12px;font-weight:900;justify-content:center;gap:8px;border:1px solid #713f12;box-shadow:0 4px 15px rgba(0,0,0,0.3);}
+.toast.warn span:first-child{font-size:16px;}
+
+/* Annex */
+.annex-card{background:#fff;border-radius:14px;border:1px solid #e8e8e8;overflow:hidden;margin-bottom:10px;}
+.annex-head{width:100%;display:flex;align-items:center;gap:12px;padding:12px 14px;background:none;border:none;cursor:pointer;text-align:right;font-family:'Heebo',sans-serif;}
+.annex-head:active{background:#f8f8f8;}
+.annex-num{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;}
+.annex-info{flex:1;text-align:right;}
+.annex-title{font-size:14px;font-weight:900;color:#1a1a2e;line-height:1.2;}
+.annex-sub{font-size:11px;color:#666;margin-top:2px;}
+.ann-chevron{font-size:14px;color:#888;transition:transform .2s;flex-shrink:0;}
+.ann-chevron.open{transform:rotate(180deg);}
+.annex-body{border-top:1px solid #f0f0f0;}
+.annex-content{padding:12px 14px;}
+.annex-item{font-size:12px;color:#333;font-weight:600;line-height:1.5;padding:6px 0;border-bottom:1px solid #f5f5f5;display:flex;align-items:flex-start;gap:8px;}
+.annex-item::before{content:"•";color:#94a3b8;flex-shrink:0;margin-top:1px;font-weight:900;}
+.annex-item:last-of-type{border-bottom:none;}
+.annex-action-btn{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:10px;border:1px solid;font-size:12px;font-weight:700;text-decoration:none;cursor:pointer;}
+.glossary-item{padding:10px 0;border-bottom:1px solid #f5f5f5;}
+.glossary-item:last-child{border-bottom:none;}
+.glossary-term{display:block;font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;}
+.glossary-term em{font-weight:400;color:#666;font-style:normal;font-size:12px;}
+.glossary-def{display:block;font-size:12px;color:#444;line-height:1.6;font-weight:500;}
+
+/* Simulator */
+.chat-container {background:#f8f9fa; border-radius:16px; padding:16px; min-height:55vh; display:flex; flex-direction:column; gap:16px; border:1px solid #e2e8f0; margin-bottom:12px;}
+.chat-msg {padding:14px 18px; border-radius:16px; max-width:85%; font-size:14px; line-height:1.5; position:relative; animation:fadeIn 0.3s ease;}
+@keyframes fadeIn {from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+.chat-student {background:#fff; border:1px solid #e2e8f0; color:#1e293b; align-self:flex-start; border-top-right-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.04);}
+.chat-teacher {background:#4f46e5; color:#fff; align-self:flex-end; border-top-left-radius:4px; box-shadow:0 2px 8px rgba(79,70,229,0.3);}
+.chat-feedback {background:#fefce8; border:1px solid #fef08a; color:#854d0e; align-self:center; max-width:95%; font-weight:700; font-size:13px; text-align:center; padding:10px 14px; margin-top:4px; box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+.chat-feedback.success {background:#f0fdf4; border-color:#bbf7d0; color:#166534;}
+.chat-feedback.error {background:#fef2f2; border-color:#fecaca; color:#991b1b;}
+.chat-options {display:flex; flex-direction:column; gap:10px; margin-top:auto;}
+.chat-opt-btn {background:#fff; border:2px solid #c7d2fe; color:#4338ca; padding:14px; border-radius:14px; font-family:'Heebo',sans-serif; font-size:14px; font-weight:700; text-align:right; cursor:pointer; transition:all 0.2s; box-shadow:0 2px 6px rgba(0,0,0,0.03);}
+.chat-opt-btn:active {background:#e0e7ff; transform:scale(0.98);}
+.chat-opt-btn:hover {border-color:#818cf8; background:#e0e7ff;}
+.chat-header {display:flex; align-items:center; gap:10px; margin-bottom:12px;}
+.chat-avatar {width:42px; height:42px; border-radius:50%; background:#94a3b8; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:900; font-size:16px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
+
+/* Text Input for Simulator */
+.chat-input-area {display:flex; gap:8px; margin-top:10px;}
+.chat-input-box {flex:1; padding:12px 14px; border-radius:14px; border:1px solid #cbd5e1; font-family:'Heebo',sans-serif; font-size:13px; outline:none; transition:all 0.2s;}
+.chat-input-box:focus {border-color:#4f46e5; box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
+.chat-send-btn {background:#4f46e5; color:#fff; border:none; border-radius:14px; padding:0 16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background 0.2s;}
+.chat-send-btn:hover {background:#4338ca;}
+.chat-send-btn:active {transform:scale(0.95);}
+
+/* Massive Simulator Button */
+.sim-btn-massive {width: 100%; padding: 18px 16px; background: linear-gradient(135deg, #4338ca, #312e81); color: #fff; border: none; border-radius: 18px; cursor: pointer; margin-top: 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: flex-start; gap: 16px; box-shadow: 0 8px 24px rgba(49, 46, 129, 0.4); position: relative; overflow: hidden; transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);}
+.sim-btn-massive:active {transform: scale(0.96);}
+.sim-btn-massive::after {content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent); transform: skewX(-20deg); animation: shine 3s infinite;}
+@keyframes shine { 0% {left: -100%;} 20% {left: 200%;} 100% {left: 200%;} }
+.sim-btn-content {display: flex; flex-direction: column; align-items: flex-start; text-align: right;}
+.sim-btn-title {font-size: 17px; font-weight: 900; line-height: 1.2; text-shadow: 0 2px 4px rgba(0,0,0,0.3);}
+.sim-btn-sub {font-size: 13px; font-weight: 500; color: #c7d2fe; margin-top: 3px;}
+.sim-btn-icon-wrap {width: 52px; height: 52px; background: rgba(255,255,255,0.15); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: inset 0 2px 6px rgba(255,255,255,0.2);}
+
+.page{display:none;}.page.active{display:block;}
+svg{display:inline-block;vertical-align:middle;}
+</style>
+</head>
+<body>
+
+<div class="phone-shell">
+  <div class="phone-btn phone-btn-silent"></div>
+  <div class="phone-btn phone-btn-vol1"></div>
+  <div class="phone-btn phone-btn-vol2"></div>
+  <div class="phone-btn phone-btn-power"></div>
+
+  <div class="phone-screen">
+    <div class="dynamic-island">
+      <div class="di-camera"></div>
+      <div class="di-sensor"></div>
+    </div>
+
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg width="17" height="12" viewBox="0 0 17 12"><rect x="0" y="8" width="3" height="4" rx=".5" fill="#1a1a1a"/><rect x="4.5" y="5.5" width="3" height="6.5" rx=".5" fill="#1a1a1a"/><rect x="9" y="3" width="3" height="9" rx=".5" fill="#1a1a1a"/><rect x="13.5" y="0" width="3" height="12" rx=".5" fill="#1a1a1a"/></svg>
+        <svg width="16" height="12" viewBox="0 0 16 12"><circle cx="8" cy="10.5" r="1.5" fill="#1a1a1a"/><path d="M3.5 6.5C5 5 6.4 4.2 8 4.2s3 .8 4.5 2.3" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" fill="none"/><path d="M.5 3.5C2.8 1.2 5.2 0 8 0s5.2 1.2 7.5 3.5" stroke="#1a1a1a" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+        <div style="display:flex;align-items:center;gap:1px;">
+          <div style="width:24px;height:12px;border:1.5px solid #1a1a1a;border-radius:3px;padding:1.5px;display:flex;align-items:center;"><div style="width:80%;height:100%;background:#1a1a1a;border-radius:1px;"></div></div>
+          <div style="width:2px;height:5px;background:#1a1a1a;border-radius:0 1px 1px 0;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-wrap">
+      <!-- Toast container -->
+      <div class="toast-container" id="toast-container"></div>
+      
+      <!-- Document Preview Modal -->
+      <div class="doc-modal-overlay" id="doc-modal-overlay" onclick="closePreview()">
+        <div class="doc-modal" id="doc-modal" onclick="event.stopPropagation()">
+          <div class="doc-modal-header">
+            <div class="doc-modal-title" id="doc-modal-title">תצוגה מקדימה</div>
+            <button class="doc-modal-close" onclick="closePreview()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+          </div>
+          <div class="doc-modal-body" id="doc-modal-body"></div>
+        </div>
+      </div>
+
+      <!-- Top bar -->
+      <div class="top-bar">
+        <div class="top-bar-row">
+          <div class="app-logo">
+            <div class="app-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v4"/><circle cx="12" cy="15" r="1" fill="white" stroke="none"/></svg>
+            </div>
+            <div>
+              <div class="app-title">חוסן בזמן אמת</div>
+              <div class="app-sub">כלי תמיכה לאובדנות • חוזר 0473</div>
+            </div>
+          </div>
+          <button class="wa-btn" onclick="window.open('https://wa.me/972545918770?text=שלום חני, אשמח להתייעצות','_blank')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.136.559 4.14 1.535 5.876L.057 23.786a.5.5 0 0 0 .614.637l6.089-1.597A11.955 11.955 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.971 0-3.81-.572-5.355-1.556l-.385-.243-3.99 1.046 1.064-3.879-.265-.406A9.955 9.955 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+            <div class="wa-dot"></div>
+          </button>
+        </div>
+        
+        <div class="disclaimer">
+          <strong>⚠️ האפליקציה מיועדת ליועצים חינוכיים</strong>
+          ואינה מחליפה עיון בחוזר מנכ"ל, היוועצות עם מדריכת שפ"י, שפ"ח ופיקוח.
+        </div>
+        
+        <!-- Search bar -->
+        <div class="search-bar">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" id="search-input" type="search" placeholder="חיפוש: נוהל, מושג, נספח..." oninput="onSearch(this.value)" />
+          <button class="search-clear" id="search-clear" onclick="clearSearch()">✕</button>
+        </div>
+      </div>
+
+      <!-- Search overlay -->
+      <div class="search-overlay" id="search-overlay" style="display:none;">
+        <div id="search-results"></div>
+      </div>
+
+      <!-- Scroll area -->
+      <div class="scroll-area" id="scroll-area">
+
+        <!-- PAGE: navigator (מפת דרכים - זהו עכשיו דף הבית המרכזי!) -->
+        <div class="page active" id="page-navigator">
+          <div id="nav-content"></div>
+        </div>
+
+        <!-- PAGE: rules (עקרונות) -->
+        <div class="page" id="page-rules">
+          <div class="section-title">עקרונות הברזל</div>
+
+          <div style="background:linear-gradient(135deg,#f0fff4,#d1fae5);border-radius:14px;padding:16px;border:1px solid #a7f3d0;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-weight:900;color:#065f46;font-size:14px;">⚓ טיפ מקצועי</div>
+            <div style="font-size:13px;color:#064e3b;font-weight:700;line-height:1.5;">אל תישארי עם זה לבד! "שיתוף בכאב ובקושי מסייע באופן ישיר בהתמודדות". השעני על הצוות הבין-מקצועי ועל הדרכה.</div>
+          </div>
+          
+          <div class="rule-card"><div class="rule-stripe" style="background:#3b82f6;"></div><div class="rule-icon-wrap" style="background:#eff6ff;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div><div class="rule-title">גבולות האחריות (תפקידנו כגשר)</div><div class="rule-desc">המערכת החינוכית מאתרת, שומרת ומלווה – <strong>אך אינה תחליף לטיפול פסיכיאטרי</strong>. תפקידנו להיות "רשת הביטחון" שמפנה.</div></div></div>
+          
+          <div class="rule-card"><div class="rule-stripe" style="background:#ef4444;"></div><div class="rule-icon-wrap" style="background:#fff5f5;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div><div class="rule-title">פיקוח נפש דוחה סודיות</div><div class="rule-desc">קדושת החיים גוברת על חיסיון. <strong>יש לפעול בשקיפות</strong> ולהסביר שחובה עלינו לדווח להוריו ולגורמי טיפול.</div></div></div>
+          
+          <div class="rule-card"><div class="rule-stripe" style="background:#a855f7;"></div><div class="rule-icon-wrap" style="background:#fdf4ff;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a855f7" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div><div><div class="rule-title">שיח ישיר ונטול פחד</div><div class="rule-desc">שאלה ישירה <strong>אינה מכניסה רעיונות</strong>. נהפוך הוא – דיבור ישיר משדר הקשבה ומציל חיים.</div></div></div>
+          
+          <div class="rule-card"><div class="rule-stripe" style="background:#10b981;"></div><div class="rule-icon-wrap" style="background:#f0fdf4;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div><div><div class="rule-title">החזקת התקווה</div><div class="rule-desc">המפגש שלנו מהווה עוגן ראשוני. "אנו חווים משבר לא קל, <strong>אך ביחד נמצא את הכוחות</strong>".</div></div></div>
+          
+          <div style="background:linear-gradient(135deg,#fffbeb,#fef3c7);border-radius:14px;padding:16px;border:2px solid #fbbf24;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:12px;"><div style="width:44px;height:44px;background:linear-gradient(135deg,#f59e0b,#d97706);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div><div style="font-size:16px;font-weight:900;color:#78350f;">כלל השומר (השגחה רציפה)</div><div style="font-size:12px;color:#92400e;margin-top:2px;line-height:1.5;">התלמיד בפיקוח עין רציף עד העברה מסודרת. <strong>לא משאירים תלמיד לבד בשום שלב.</strong></div></div></div>
+          </div>
+          
+          <div class="section-title">מילון מושגים מקוצר</div>
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #6366f1;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">מחשבות אובדניות <span style="color:#666;font-weight:500;font-size:12px;">(Suicidal Ideation)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">יכולות להיות פסיביות (רצון למות / להיעלם), פעילות (מחשבות להרוג את עצמו), או תוכנית קונקרטית ברמת המחשבה בלבד ללא התארגנות מעשית בפועל.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #ef4444;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">כוונה אובדנית <span style="color:#666;font-weight:500;font-size:12px;">(Intent)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;"><strong>משאלה סובייקטיבית</strong> שפגיעה עצמית תגרום למוות.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #f59e0b;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">התנהגות אובדנית</div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">מעשים המעידים על כוונת התאבדות — כל דבר מעשי מעבר למחשבה: היערכות עם אמצעי ספציפי, התארגנות (חלוקת חפצים, כתיבת מכתב).</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #c0392b;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">ניסיון אובדני</div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">מעשה פגיעה עצמית שבה מתקיים לפחות רצון מסוים למות. <strong>אינו מחייב נזק בפועל</strong> — עצם האפשרות לפגיעה היא חלק מההגדרה.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #94a3b8;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">ניסיון שסוכל / שנזנח <span style="color:#666;font-weight:500;font-size:12px;">(Aborted / Disrupted)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">סוכל (Aborted) = הופסק על ידי נסיבות חיצוניות. נזנח (Disrupted) = הופסק על ידי האדם עצמו.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #dc2626;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">קטלניות <span style="color:#666;font-weight:500;font-size:12px;">(Lethality)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">מידת הסכנה לחיים בשל הניסיון האובדני. קטלניות עלולה להיות פוטנציאלית לאובדנות גם ללא נזק רפואי ממשי.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #f59e0b;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">פגיעה עצמית לא אובדנית <span style="color:#666;font-weight:500;font-size:12px;">(NSSI)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">פגיעה עצמית מכוונת ללא כל כוונה למות. <strong>מחייב הערכה לשלילת כוונה סמויה.</strong></div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #1a1a2e;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">התאבדות <span style="color:#666;font-weight:500;font-size:12px;">(Suicide)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">פעולה שבה אדם שם קץ לחייו ומביא למותו בכוונה תחילה. הכוונה יכולה להיות חלקית.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #ef4444;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">סיכון ממשי ומיידי</div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">מצבים שבהם קיימת סכנת חיים, אשר אינם ניתנים להתמודדות במסגרת השגחת הצוות החינוכי ודורשים מעורבות משטרה.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #4f46e5;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">צל"ח <span style="color:#666;font-weight:500;font-size:12px;">(צוות לשעת חירום)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">מכונס בראשות <strong>מפקח מוסד החינוך</strong>. הרכב חובה: מנהל השפ"ח/נציגו, מפקח ייעוץ/נציגו, מנהל, יועץ, פסיכולוג.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #6b7280;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">עו"ס פנימייתי</div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">עובד סוציאלי מטעם האגף הפסיכוסוציאלי-רפואי במינהל לחינוך התיישבותי, פנימייתי ועליית הנוער.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #6b7280;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">קב"ס</div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">קצין ביקור סדיר — גורם קישור בין בית הספר לרשויות הרלוונטיות.</div></div></div>
+          
+          <div class="card" style="margin-bottom:10px;border-right:4px solid #7c3aed;"><div style="padding:12px 14px;"><div style="font-size:14px;font-weight:900;color:#1a1a2e;margin-bottom:4px;">מנהל מקרה <span style="color:#666;font-weight:500;font-size:12px;">(Case Manager)</span></div><div style="font-size:12px;color:#444;line-height:1.5;font-weight:500;">הגורם המקצועי האחראי על המשך ליווי המקרה — <strong>נקבע על ידי הצוות הרב-מקצועי</strong> ומעדכן את ההורים. (סעיף 7ג לחוזר)</div></div></div>
+        </div>
+
+        <!-- PAGE: signs -->
+        <div class="page" id="page-signs">
+          <div class="section-title">זיהוי סימנים</div>
+
+          <div class="card" style="margin-bottom:12px;border-right:4px solid #ef4444;">
+            <div style="padding:12px 14px;background:#fff5f5;border-bottom:1px solid #fee2e2;display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#b91c1c" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              <span style="font-size:14px;font-weight:900;color:#b91c1c;flex:1;">גורמי סיכון</span>
+              <span style="font-size:11px;color:#666;font-weight:700;">לפי סעיף 5.1</span>
+            </div>
+            <div style="padding:12px 14px;">
+              <div style="font-size:12px;font-weight:900;color:#1a1a2e;margin-bottom:6px;">🔴 גורמים עיקריים:</div>
+              <div style="font-size:12px;color:#444;line-height:1.7;font-weight:500;">● מחשבות אובדניות ו/או ניסיון קודם<br>● פסיכופתולוגיה — ובעיקר דיכאון<br>● אירועי חיים מלחיצים: אובדן, פגיעה, כישלון<br>● קשיי פתרון בעיות, אימפולסיביות, בדידות<br>● גורמים משפחתיים והיעדר תמיכה<br>● קושי להיעזר בטיפול ונגישות לאמצעים</div>
+              <div style="background:#fef2f2;border-radius:8px;padding:10px;margin-top:10px;">
+                <div style="font-size:12px;font-weight:900;color:#991b1b;margin-bottom:6px;">קבוצות בסיכון מוגבר:</div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                  <span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900;padding:4px 10px;border-radius:8px;">גברים ונערים</span>
+                  <span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900;padding:4px 10px;border-radius:8px;">להט"ב</span>
+                  <span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900;padding:4px 10px;border-radius:8px;">נפגעי נפש</span>
+                  <span style="background:#fee2e2;color:#991b1b;font-size:11px;font-weight:900;padding:4px 10px;border-radius:8px;">עולים</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:linear-gradient(135deg,#fdf0ff,#f5e8ff);border-radius:14px;padding:16px;border:1px solid #e0c0f0;margin-bottom:12px;">
+            <div style="font-size:14px;font-weight:900;color:#7c3aed;margin-bottom:10px;">💬 רמזים מילוליים</div>
+            <div class="verbal-quote">"אין לי כוח יותר לעולם הזה"</div>
+            <div class="verbal-quote">"תשמרו על הדברים שלי"</div>
+            <div class="verbal-quote">"בקרוב הכל ייגמר"</div>
+            <div class="verbal-quote">"אני נטל על כולם"</div>
+            <div class="verbal-quote" style="margin-bottom:0;">"היה כיף איתכם"</div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+            <div style="padding:14px;border-radius:12px;background:#fffbeb;border:1px solid #fbbf24;"><div style="font-size:12px;font-weight:900;color:#92400e;margin-bottom:6px;">● התנהגותי</div><div style="font-size:12px;color:#78350f;line-height:1.5;font-weight:500;">חלוקת חפצים, הזנחה, חיפוש אמצעים, כתיבת מכתב.</div></div>
+            <div style="padding:14px;border-radius:12px;background:#fff5f5;border:1px solid #fca5a5;"><div style="font-size:12px;font-weight:900;color:#991b1b;margin-bottom:6px;">● רגשי</div><div style="font-size:12px;color:#7f1d1d;line-height:1.5;font-weight:500;">דיכאון, ייאוש, חוסר תקווה, תחושת נטל, אשמה כבדה.</div></div>
+            <div style="padding:14px;border-radius:12px;background:#f0fdf4;border:1px solid #86efac;"><div style="font-size:12px;font-weight:900;color:#14532d;margin-bottom:6px;">● גופני</div><div style="font-size:12px;color:#166534;line-height:1.5;font-weight:500;">שינוי בשינה, ירידה בלימודים, היעדרויות מרובות.</div></div>
+            <div style="padding:14px;border-radius:12px;background:#eff6ff;border:1px solid #93c5fd;"><div style="font-size:12px;font-weight:900;color:#1e40af;margin-bottom:6px;">● אחר</div><div style="font-size:12px;color:#1e3a8a;line-height:1.5;font-weight:500;">האדרת מוות, ריבוי תאונות, קושי מוגזם בכישלון.</div></div>
+          </div>
+
+          <!-- סימנים ברשת הדיגיטלית -->
+          <div style="background:linear-gradient(135deg,#1e1b4b,#2d2a5e);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 4px 12px rgba(30,27,75,0.2);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div>
+                <div style="font-size:15px;font-weight:900;color:#fff;">סימנים ברשת הדיגיטלית</div>
+                <div style="font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;font-weight:500;">זירה נפרדת לפי החוזר - סעיף 5.2</div>
+              </div>
+              <div style="width:36px;height:36px;background:rgba(255,255,255,.1);border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              </div>
+            </div>
+            <div style="font-size:13px;color:rgba(255,255,255,.9);font-weight:700;line-height:1.8;margin-bottom:14px;">
+              <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:#a5b4fc;">•</span> פוסטים / סטורי על מוות, ייאוש, פרידה</div>
+              <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:#a5b4fc;">•</span> חיפושים מחשידים באינטרנט</div>
+              <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:#a5b4fc;">•</span> תכתובות המעידות על כוונה</div>
+              <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:#a5b4fc;">•</span> פרסום תמונות של פגיעות עצמיות</div>
+              <div style="display:flex;align-items:flex-start;gap:8px;"><span style="color:#a5b4fc;">•</span> שייכות לקהילות מגבירות סיכון</div>
+            </div>
+            <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:10px;padding:12px;text-align:center;">
+              <div style="font-size:12px;color:#fbbf24;font-weight:900;">⚠️ המרחב הווירטואלי הוא זירה נוספת – לא פחות חשובה מהפיזית</div>
+            </div>
+          </div>
+
+          <div style="background:#fff5f5;border-radius:14px;padding:16px;border:1px solid #f0c0c0;margin-bottom:14px;">
+            <div style="font-size:15px;font-weight:900;color:#7f1d1d;margin-bottom:10px;">🚨 דגלים אדומים — פעולה מיידית</div>
+            <div style="font-size:13px;font-weight:700;color:#7a1a1a;line-height:1.8;">
+              ● אמירה ישירה על רצון למות<br>
+              ● כתיבת מכתב פרידה<br>
+              ● חיפוש / רכישת אמצעי פגיעה<br>
+              ● ניסיון אובדני קודם<br>
+              ● שינוי דרסטי לרוגע פתאומי אחרי משבר
+            </div>
+          </div>
+
+          <button onclick="switchTab('navigator')" style="width:100%;padding:14px;background:linear-gradient(135deg,#c0392b,#e74c3c);color:#fff;font-size:14px;font-weight:900;border:none;border-radius:14px;cursor:pointer;font-family:'Heebo',sans-serif;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            זיהית סימן? עברי למסלול פעולה
+          </button>
+        </div>
+
+        <!-- PAGE: qpr -->
+        <div class="page" id="page-qpr">
+          <div class="nav-header" style="background:#fff; margin-bottom:12px; padding:8px 10px;">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;">
+              <button class="back-btn" onclick="switchTab('navigator')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+              <div class="nav-title" style="color:#1a1a2e; display:flex; align-items:center; gap:8px;">
+                <div style="width:28px;height:28px;background:#1a1a2e;border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                תשאול QPR / R.P.Q
+              </div>
+            </div>
+          </div>
+          <div style="font-size:13px;color:#666;font-weight:700;margin-bottom:12px;text-align:right;">Question · Persuade · Refer — שאל · שכנע · הפנה</div>
+          
+          <div style="background:#f0f8ff;border-radius:12px;padding:14px;border:1px solid #bdd9ef;margin-bottom:16px;font-size:13px;color:#333;font-weight:500;line-height:1.6;text-align:center;">
+            <strong style="color:#1a1a2e;font-weight:900;">הבהרה מקצועית:</strong> QPR הוא כלי שיחה ראשונית. אינו מחליף הערכת סיכון מקצועית. אין להשאיר את התלמיד לבד לאחר השיחה.
+          </div>
+          
+          <div id="qpr-steps-container"></div>
+          
+          <button onclick="switchTab('simulator')" style="width:100%;padding:14px;background:linear-gradient(135deg, #15803d, #166534);color:#fff;font-size:14px;font-weight:900;border:none;border-radius:14px;cursor:pointer;margin-top:16px;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(21,128,61,0.3);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            לתרגול התשאול בסימולטור AI
+          </button>
+        </div>
+
+        <!-- PAGE: docs -->
+        <div class="page" id="page-docs">
+          <div class="section-title">נספחים וכלים</div>
+
+          <a href="https://apps.education.gov.il/Mankal/horaa.aspx?siduri=590" target="_blank" class="doc-btn" style="background:#eff6ff;border-color:#bfdbfe;">
+            <div class="doc-icon" style="background:#dbeafe;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg></div>
+            <div><div class="doc-title" style="color:#1e40af;">חוזר מנכ"ל 0473 – המלא</div><div style="font-size:11px;color:#666;font-weight:700;margin-top:2px;">אתר משרד החינוך · 30.3.2026</div></div>
+          </a>
+
+          <a href="https://canva.link/xmlw5y20d5cscfa" target="_blank" class="doc-btn" style="background:linear-gradient(135deg,#fdf4ff,#f5e8ff);border-color:#e9d5ff;margin-bottom:16px;">
+            <div class="doc-icon" style="background:linear-gradient(135deg,#e9d5ff,#ddd6fe);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+            <div><div class="doc-title" style="color:#6d28d9;">בוחרים בחיים – כלים ליועץ</div><div style="font-size:11px;color:#666;font-weight:700;margin-top:2px;">מצגת Canva לעבודה עם תלמידים</div></div>
+          </a>
+
+          <div id="annex-container-docs"></div>
+        </div>
+
+        <!-- PAGE: prevention -->
+        <div class="page" id="page-prevention">
+          <div class="section-title" style="margin-bottom:4px;">מניעה והכשרה</div>
+          <div style="font-size:12px;color:#666;font-weight:700;margin-bottom:16px;">סעיפים 9.1–9.2 לחוזר</div>
+
+          <div style="background:linear-gradient(135deg,#f0fdf4,#dcfce7);border-radius:14px;padding:16px;border:1px solid #86efac;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+              <div style="width:40px;height:40px;background:linear-gradient(135deg,#15803d,#22c55e);border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div>
+                <div style="font-size:16px;font-weight:900;color:#14532d;">שומרי סף — הכשרה שנתית</div>
+                <div style="font-size:11px;color:#166534;font-weight:900;margin-top:2px;">חובה · 3 שעות · רבעון ראשון</div>
+              </div>
+            </div>
+
+            <div style="font-size:12px;color:#14532d;line-height:1.7;font-weight:700;margin-bottom:12px;">
+              ● זיהוי סימני מצוקה והתנהגות אובדנית<br>
+              ● גורמי סיכון ואוכלוסיות ייחודיות (חנ"מ)<br>
+              ● דרכי תשאול (QPR / R.P.Q)<br>
+              ● התאמת שיח לאוכלוסיות וצרכים שונים<br>
+              ● נהלי יידוע והתערבות מוסדיים<br>
+              ● עידוד תלמידים לפנות לסיוע כ"שומרי סף"<br>
+              ● בטיחות ברשת (מטה 105)<br>
+              ● עבודה עם מיתוסים והפרכתם<br>
+              ● היכרות עם גורמי סיוע בקהילה
+            </div>
+            
+            <button onclick="goToAnnex('ann1')" style="width:100%;padding:10px;background:#fff;color:#15803d;font-size:12px;font-weight:900;border:1px solid #86efac;border-radius:8px;cursor:pointer;margin-bottom:12px;box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+              לנספח 1 המלא (נושאי הכשרה) 👈
+            </button>
+
+            <div style="background:rgba(255,255,255,.8);border-radius:10px;padding:10px;display:flex;align-items:center;gap:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#92400e" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+              <span style="font-size:12px;font-weight:900;color:#92400e;">אישור ביצוע למפקח הכולל — עד 1 בינואר</span>
+            </div>
+          </div>
+
+          <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe);border-radius:14px;padding:16px;border:1px solid #93c5fd;margin-bottom:14px;">
+            <div style="font-size:16px;font-weight:900;color:#1e40af;margin-bottom:12px;">📚 תוכניות מניעה לתלמידים</div>
+            <div style="background:rgba(255,255,255,.9);border-radius:10px;padding:12px;margin-bottom:10px;">
+              <div style="font-size:14px;font-weight:900;color:#1e3a8a;margin-bottom:4px;">הכוחות שבדרך</div>
+              <div style="font-size:12px;color:#1e40af;line-height:1.5;font-weight:500;">חוסן נפשי לכל שלבי הגיל — מגן ועד כיתה ט'. כולל יחידות מניעת אובדנות.</div>
+            </div>
+            <div style="background:rgba(255,255,255,.9);border-radius:10px;padding:12px;">
+              <div style="font-size:14px;font-weight:900;color:#1e3a8a;margin-bottom:4px;">בוחרים בחיים — כיתה ט' (חובה)</div>
+              <div style="font-size:12px;color:#1e40af;line-height:1.5;font-weight:500;">7 מפגשים לשיח ישיר ומקצועי עם מתבגרים. מחייב הכשרה מטעם שפ"י.</div>
+            </div>
+          </div>
+          
+          <div style="background:linear-gradient(135deg,#fdf4ff,#f3e8ff);border-radius:14px;padding:16px;border:1px solid #e9d5ff;margin-bottom:14px;">
+            <div style="font-size:15px;font-weight:900;color:#6d28d9;margin-bottom:12px;">💜 מסרי חוסן מרכזיים</div>
+            <div id="prevention-resilience-msgs"></div>
+            <button onclick="goToAnnex('ann6')" style="width:100%;padding:10px;background:#fff;color:#6d28d9;font-size:12px;font-weight:900;border:1px solid #e9d5ff;border-radius:8px;cursor:pointer;margin-top:12px;box-shadow:0 2px 5px rgba(0,0,0,0.05);">
+              לכל 19 המסרים המלאים (נספח 6) 👈
+            </button>
+          </div>
+
+          <button onclick="switchTab('simulator')" style="width:100%;padding:14px;background:linear-gradient(135deg, #15803d, #166534);color:#fff;font-size:14px;font-weight:900;border:none;border-radius:14px;cursor:pointer;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;box-shadow:0 4px 12px rgba(21,128,61,0.3);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            לסימולטור שיח למורים (אימון AI)
+          </button>
+        </div>
+
+        <!-- PAGE: checklist -->
+        <div class="page" id="page-checklist">
+          <div style="margin-bottom:16px;">
+            <div class="section-title" style="margin-bottom:4px;">צ'ק ליסט מקצועי</div>
+            <div style="font-size:12px;color:#64748b;font-weight:700;margin-bottom:14px;">לפי חוזר מנכ"ל 0473 · סמני כל שלב שבוצע</div>
+            <div class="scenario-grid" id="scenario-btns"></div>
+          </div>
+          <div id="cl-content"></div>
+        </div>
+
+        <!-- PAGE: Simulator (New Feature) -->
+        <div class="page" id="page-simulator">
+          <div class="nav-header" style="background:#fff; margin-bottom:12px;">
+            <div style="display:flex;align-items:center;gap:8px;flex:1;">
+              <button class="back-btn" onclick="switchTab('qpr')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>
+              <div class="nav-title" style="color:#15803d;">סימולטור מורים (QPR)</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#555;font-weight:500;margin-bottom:12px;background:#f0fdf4;border:1px solid #bbf7d0;padding:10px;border-radius:10px;">
+            <strong>תרגול שיח פתוח:</strong> כיצד נגיב לתלמיד המביע מצוקה? בחרי תשובה או כתבי משלך (הבוט יכוון לעקרונות החוזר).
+          </div>
+          <div class="chat-container" id="chat-container">
+            <!-- Chat will be rendered here dynamically -->
+          </div>
+        </div>
+
+      </div><!-- /scroll-area -->
+
+      <!-- Bottom nav -->
+      <div class="bottom-nav">
+        <div class="nav-inner">
+
+          <!-- נספחים -->
+          <button class="nav-btn" onclick="switchTab('docs')" id="tab-docs">
+            <div class="nav-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg></div>
+            <span class="nav-btn-label">נספחים</span>
+          </button>
+
+          <!-- מניעה -->
+          <button class="nav-btn" onclick="switchTab('prevention')" id="tab-prevention">
+            <div class="nav-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+            <span class="nav-btn-label">מניעה</span>
+          </button>
+
+          <!-- תשאול -->
+          <button class="nav-btn" onclick="switchTab('qpr')" id="tab-qpr">
+            <div class="nav-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <span class="nav-btn-label">תשאול</span>
+          </button>
+
+          <!-- בית (מפת דרכים) -->
+          <div class="nav-center home-active" id="tab-navigator" onclick="switchTab('navigator')">
+            <div class="nav-center-circle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>
+            </div>
+            <span class="nav-center-label">בית</span>
+          </div>
+
+          <!-- סימנים -->
+          <button class="nav-btn" onclick="switchTab('signs')" id="tab-signs">
+            <div class="nav-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div>
+            <span class="nav-btn-label">סימנים</span>
+          </button>
+
+          <!-- צ'ק ליסט -->
+          <button class="nav-btn" onclick="switchTab('checklist')" id="tab-checklist">
+            <div class="nav-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+            <span class="nav-btn-label">צ'ק ליסט</span>
+          </button>
+
+          <!-- עקרונות -->
+          <button class="nav-btn" onclick="switchTab('rules')" id="tab-rules">
+            <div class="nav-btn-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
+            <span class="nav-btn-label">עקרונות</span>
+          </button>
+
+        </div>
+      </div>
+    </div><!-- /app-wrap -->
+
+    <div class="home-indicator"></div>
+  </div><!-- /phone-screen -->
+</div><!-- /phone-shell -->
+
+<script>
+const qprBtnHtml = `<span onclick="event.stopPropagation(); switchTab('qpr');" style="display:inline-flex; align-items:center; background:#e0e7ff; color:#4338ca; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:900; margin-right:6px; box-shadow:0 2px 4px rgba(67,56,202,.15); vertical-align:middle; cursor:pointer;">למדריך QPR 👈</span>`;
+
+// --- פונקציית מעבר ישיר לנספח ---
+function goToAnnex(annexId) {
+  switchTab('docs');
+  setTimeout(() => {
+    const el = document.getElementById(annexId);
+    if(el) {
+      const body = el.querySelector('.annex-body');
+      const chevron = el.querySelector('.ann-chevron');
+      if(body && body.style.display === 'none') {
+        body.style.display = 'block';
+        if(chevron) chevron.classList.add('open');
+      }
+      el.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+  }, 100);
+}
+
+// --- מפת דרכים (תרחישים בתוך הניווט) ---
+const screens = {
+  home: { type:'home', title:'מנווט תרחישים' },
+  'emg-1-2': { type:'procedure', title:'סכנת חיים – נוהל', text:'ידווח הצוות למשטרה / מד"א. המוסד יפעל להשגחה מיידית וצמודה.', checklist:[{id:'e1',text:'דיווח למשטרה (100) / מד"א (101)'},{id:'e2',text:'יידוע מנהל המסגרת'},{id:'e3',text:'השגחה מיידית – לא להשאיר לבד!'},{id:'e4',text:'תיעוד ראשוני'},{id:'e5',warn:true,text:'הרחקת אמצעים מסוכנים: תרופות, כלים חדים'}], next:{label:'המשך – השגחה',id:'emg-1-3'} },
+  'emg-1-3': { type:'procedure', title:'השגחה עד הגעת הורים', text:'השגחה רציפה בהנחיית מנהל המסגרת עד מסירה למבוגר.', rules:['ההשגחה תקפה בהיעדר התוויה אחרת מגורמי ברה"ן.'], checklist:[{id:'f1',text:'התלמיד אינו נשאר לבד'},{id:'f2',text:'יצירת קשר עם ההורים'},{id:'f3',text:'עדכון יועץ/פסיכולוג'}], next:{label:'כינוס צל"ח',id:'sys-4-1'} },
+  'sus-2-1': { type:'procedure', title:'סימני מצוקה', text:'נוהלי התערבות בעת זיהוי סימן מחשיד.', checklist:[{id:'s1',text:'יידוע מנהל מיידי'},{id:'s2',text:'השגחה מיידית'},{id:'s3',text:'פנייה להערכה ושיחה (QPR)' + qprBtnHtml},{id:'s4',warn:true,text:'שיחה לאחר היוועצות שפ"ח, לפני יידוע הורים'}], next:{label:'שרשרת יידוע',id:'inf-3-1'} },
+  'say-2-2': { type:'procedure', title:'אמירה אובדנית', text:'ביטוי מילולי/כתוב של רצון למות. מחייב פעולה מיידית.', rules:['אמירה אובדנית מחייבת תשאול ישיר (QPR).'], checklist:[{id:'sa1',text:'לא להשאיר לבד'},{id:'sa2',text:'תשאול ישיר (QPR)' + qprBtnHtml},{id:'sa3',text:'היוועצות שפ"ח ומדריכת חירום'},{id:'sa4',text:'יידוע מנהל'},{id:'sa5',warn:true,text:'אין לדחות — כל אמירה מחייבת בדיקה'}], next:{label:'שרשרת יידוע',id:'inf-3-1'} },
+  'int-2-3': { type:'procedure', title:'כוונה אובדנית', 
+    alert: 'כוונה אובדנית = סיכון גבוה יותר מאמירה. מחייב הערכת סיכון מקצועית בהקדם.',
+    text:'משאלה סובייקטיבית שפגיעה עצמית תגרום למוות — מעבר לאמירה, עם כיוון למעשה.', 
+    checklist:[{id:'in1',text:'השגחה מיידית – לא להשאיר לבד'},{id:'in2',text:'הרחקת אמצעים מסוכנים'},{id:'in3',text:'תשאול ישיר (QPR)' + qprBtnHtml},{id:'in4',text:'היוועצות פסיכולוג שפ"ח לדחיפות ההפניה'},{id:'in5',text:'יידוע מנהל מיידי'},{id:'in6',text:'יידוע הורים וזימונם'}], next:{label:'שרשרת יידוע',id:'inf-3-1'} },
+  'thr-2-1': { type:'procedure', title:'איום בהתאבדות', text:'איום מחייב הפעלת נוהל קפדני.', checklist:[{id:'t1',text:'לא להשאיר לבד'},{id:'t2',text:'יידוע מנהל וטיפול'},{id:'t3',text:'בחינת צורך בדיווח משטרה'},{id:'t4',text:'יצירת קשר עם הורים'},{id:'t5',warn:true,text:'הרחקת אמצעים מהמשפחה: תרופות, נשק'}], next:{label:'שרשרת יידוע',id:'inf-3-1'} },
+  'nssi-2-4': { type:'procedure', title:'פגיעה עצמית (NSSI)', text:'פגיעה מכוונת ללא כוונה למות. מחייב הערכה.', rules:['NSSI חייבת הערכה לשלילת כוונה סמויה.'], checklist:[{id:'ns1',text:'שיחה אישית ללא שיפוטיות'},{id:'ns2',text:'תשאול ישיר (QPR)' + qprBtnHtml},{id:'ns3',text:'היוועצות שפ"ח'},{id:'ns4',text:'יידוע מנהל והורים'},{id:'ns6',warn:true,text:'אל תניחי שאין כוונה — הערכה חובה'}], next:{label:'שרשרת יידוע',id:'inf-3-1'} },
+  'inf-3-1': { type:'procedure', title:'שרשרת יידוע', text:'שרשרת דיווח לפי חוזר מנכ"ל 0473.', rules:['כל איש צוות ← מנהל ← מפקח/מחוז ← מנכ"ל.'], checklist:[{id:'i1',text:'מנהל: יידוע יועץ+פסיכולוג+מפקח'},{id:'i2',text:'פסיכולוג: יידוע מנהל שפ"ח'},{id:'i3',text:'יועץ: דיווח מפקח ייעוץ ← מדריכת חירום'},{id:'i5',warn:true,text:'מנהל מחוז: עדכון מנכ"ל (בפציעה/אשפוז/מוות)'}], next:{label:'כינוס צל"ח',id:'sys-4-1'} },
+  'sys-4-1': { type:'procedure', title:'כינוס צל"ח', text:'צוות רב-מקצועי בראשות מפקח מוסד החינוך.', rules:['יו"ר: מפקח מוסד החינוך (לא המנהל!).'], checklist:[{id:'c1',text:'כונס צל"ח'},{id:'c2',text:'מופו מעגלי פגיעות'},{id:'c3',text:'גובשה תוכנית התערבות'},{id:'c4',text:'נשמר קשר עם הגורם המעריך'}], next:{label:'חזרה לבית',id:'home'} },
+  'lt-6-1': { type:'procedure', title:'מעקב ארוך טווח', text:'מינימום 3 שיחות מעקב לאורך שנה.', checklist:[{id:'l1',text:'עדכון שבוצעה הערכה'},{id:'l2',text:'נשמרו המלצות'},{id:'l3',text:'נקבעו מעקבים לשנה'},{id:'l6',text:'נבנתה תוכנית פסיכו-חינוכית'},{id:'l5',warn:true,text:'מעבר מוסד: חובה להעביר מידע'}], next:{label:'חזרה',id:'home'} },
+  'att-7-1': { type:'procedure', title:'חזרה מאשפוז', text:'מחייב ליווי ומינוי מנהל מקרה (Case Manager).', rules:['ישיבת מעבר עם הצוות, תיאום טיפול, מנהל מקרה.'], checklist:[{id:'a1',text:'מונה מנהל מקרה'},{id:'a2',text:'תוכנית ליווי עם הורים'},{id:'a3',text:'תואמו גורמי טיפול בקהילה'},{id:'a6',warn:true,text:'מולא נספח 5 לפיקוח'}], next:{label:'מעקב ארוך טווח',id:'lt-6-1'} },
+  'attempt-7-1': { type:'procedure', title:'ניסיון אובדני', text:'ניסיון עם פציעה/אשפוז - חל נוהל ייעודי (סעיף 7).', rules:['מחליף ועדת בדיקה. ממונה צוות רב-מקצועי.'], checklist:[{id:'at1',text:'דיווח למפקח הכולל'},{id:'at2',text:'יועץ ← מפקח ייעוץ ← מדריכת חירום שפ"י'},{id:'at3',text:'צוות בראשות המפקח'},{id:'at5',text:'תוכנית ארוכת טווח'},{id:'at7',warn:true,text:'עדכון הורים בתוכנית'}], next:{label:'חזרה מאשפוז',id:'att-7-1'} },
+  'sui-8-1': { type:'procedure', title:'התאבדות תלמיד', text:'בידוד זירה, מד"א, משטרה ויידוע מלא (סעיף 8).', rules:['נוהל סעיף 8 נפרד מניסיון אובדני.'], checklist:[{id:'u1',text:'בידוד זירה + מד"א ומשטרה'},{id:'u2',text:'יידוע פסיכולוג/יועץ'},{id:'u3',text:'היוועצות לפני יידוע צוות'},{id:'u7',warn:true,text:'מנהל מחוז ← מנכ"ל'},{id:'u10',text:'תוכנית 30 יום'},{id:'u11',warn:true,text:'צל"ח נוסף תוך 10 ימים'}], next:{label:'חזרה לבית',id:'home'} },
+  'sp-10-1': { type:'procedure', title:'חינוך מיוחד', text:'שינוי בהתנהגות מחייב הפניה.', checklist:[{id:'p1',text:'הפניה מיידית'},{id:'p2',text:'הדרכת הורים לדיווח'},{id:'p3',text:'תוכנית מותאמת בצוות רב-מקצועי'}], next:{label:'חזרה לבירור',id:'sus-2-1'} },
+  'prev-11-1': { type:'procedure', title:'מניעה', text:'תוכניות מניעה ושומרי סף מראש.', rules:['הכשרה שנתית חובה – 3 שעות לצוות.'], checklist:[{id:'v1',text:'"בוחרים בחיים" (ט\')'},{id:'v2',text:'"הכוחות שבדרך"'},{id:'v3',text:'שומרי סף בלו"ז'},{id:'v5',warn:true,text:'אישור ביצוע עד 1 בינואר'}], next:{label:'חזרה',id:'home'} }
+};
+
+const homeTiles = [
+  {num:'01',label:'סימני מצוקה / חשד',sub:'זיהוי ראשוני וחשיבה אובדנית',color:'#c0392b',bg:'#fff5f5',next:'sus-2-1'},
+  {num:'02',label:'אמירה אובדנית',sub:'ביטוי מילולי / כתוב / דיגיטלי של רצון למות',color:'#b45309',bg:'#fffbeb',next:'say-2-2'},
+  {num:'03',label:'כוונה אובדנית',sub:'משאלה שפגיעה תגרום למוות',color:'#7c3aed',bg:'#faf0ff',next:'int-2-3'},
+  {num:'04',label:'איום בהתאבדות',sub:'אמירה ישירה, מכתב, רשתות',color:'#d35400',bg:'#fff8f0',next:'thr-2-1'},
+  {num:'05',label:'פגיעה עצמית לא אובדנית',sub:'NSSI – ללא כוונה למות, חייב הערכה',color:'#0f766e',bg:'#f0fdfa',next:'nssi-2-4'},
+  {num:'06',label:'ניסיון אובדני',sub:'פציעה / טיפול רפואי / אשפוז – סעיף 7',color:'#5a2d8c',bg:'#faf0ff',next:'attempt-7-1'},
+  {num:'07',label:'חזרה לאחר אשפוז',sub:'ניסיון אובדני / אשפוז פסיכיאטרי',color:'#1a6b9e',bg:'#f0f8ff',next:'att-7-1'},
+  {num:'08',label:'חשד להתאבדות מוגמרת',sub:'בידוד זירה · מד"א · משטרה – סעיף 8',color:'#c0392b',bg:'#fff5f5',next:'sui-8-1'}
+];
+
+const qprSteps = [
+  {
+    letter: 'Q', color: '#1a6b9e', bg: '#f0f8ff', bc: '#bdd9ef', hebrew: 'לשאול', english: 'Question', 
+    goal: 'לשאול ישירות וברגישות על כוונה אובדנית',
+    yes: [
+      'להיות קשוב מאוד לתלמיד ולהעניק לו תמיכה רבה (סעיף 6.1.ד)',
+      'לשאול גם שאלות ישירות וברורות לגבי הכוונה האובדנית (סעיף 6.1.ד)'
+    ],
+    no: [
+      'להימנע לחלוטין משיפוטיות או הטפות מוסר (סעיף 6.1.ד)'
+    ],
+    rat: 'חשוב לא להתעלם משום רמז אובדני, כל רמז מחייב בדיקה והתערבות. (נספח 6)'
+  },
+  {
+    letter: 'P', color: '#3f8242', bg: '#f2faf0', bc: '#c0ddb0', hebrew: 'לשכנע', english: 'Persuade', 
+    goal: 'לשכנע לקבלת עזרה ולערב מבוגר אחראי / הורים',
+    yes: [
+      'לשתף את התלמיד בתהליך ובהסבר אודות החובה ליידע את הוריו מתוך דאגה לשלומו (סעיף 6.1.ה)',
+      'להעביר מסר שחשוב לדבר ושתמיד יש מבוגר שמוכן להקשיב ולעזור (סעיף 9.2.2)'
+    ],
+    no: [
+      'אין להשאיר לתלמיד את זכות ההחלטה באשר ליידוע המשפחה (סעיף 6.1.ה)',
+      'אין להשאיר את התלמיד לבד בשום שלב עד להגעת הוריו (סעיף 6.1.ב)'
+    ],
+    rat: 'פנייה לעזרה היא עדות לכוח נפשי של הפונה, ולא לחולשה! שיתוף גורם מקצועי במצוקת חבר איננה "הלשנה", אלא הצלת חיים. (נספח 6)'
+  },
+  {
+    letter: 'R', color: '#6b3a9e', bg: '#faf0ff', bc: '#d4b8ef', hebrew: 'להפנות', english: 'Refer', 
+    goal: 'להפנות לגורמי סיוע מקצועיים',
+    yes: [
+      'ליידע את ההורים באופן מידי ולזמנם למסגרת החינוכית (סעיף 6.1.ג)',
+      'להיוועץ עם פסיכולוג מטעם השפ"ח באשר לדחיפות ההפניה (סעיף 6.1.ו)',
+      'למסור להורים מסמך כתוב... ולבקש המלצות לגבי המשך ההתערבות (סעיף 6.1.ו)',
+      'לתעד את מהלך ההתערבות בכתב (סעיף 6.1.ט)'
+    ],
+    no: [
+      'אין למנוע את הגעתו של התלמיד למסגרת החינוכית עד להבאת אישור הערכת סיכון (סעיף 6.1.ו)',
+      'לא לסיים מעורבות לאחר ההפניה - לנהל מעקב וליווי מתמשכים (סעיף 6.1.יא)'
+    ],
+    rat: 'טיפול מיטבי מצריך שיתוף פעולה בין צוותים מקצועיים במסגרות החינוך והטיפול ובין גורמים רלוונטיים בקהילה. (מבוא, סעיף 3)'
+  }
+];
+
+const resilienceMsgs = [
+  'במקרים רבים, ובעיקר בקרב ילדים ובני נוער, התאבדות ניתנת למניעה.',
+  'רוב האנשים רוצים לחיות, וההתנהגות האובדנית היא ניסיון להפסיק כאב נפשי עז.',
+  'בני נוער יכולים לסייע לחבר, אבל חשוב לשתף מבוגר אחראי שיערב גורמי מקצוע.',
+  'אנשים שהיו בסיכון אובדני וקיבלו טיפול מקצועי, מדווחים על חיים מלאים ועשירים.',
+  'לכל בעיה יש יותר מפתרון אחד!',
+  'מצב לחץ גורם לחשיבה נוקשה, לכן מומלץ ללמד ויסות רגשי ובחינת המצב מזוויות שונות.',
+  'מצבים בחיים הם זמניים והפיכים. המוות הוא סופי.',
+  'אי וודאות עלולה לגרום לחרדה ובלבול, אך זהו מצב זמני!',
+  'ניתן להתאמן על חשיבה אופטימית ע"י הצבת סימן שאלה בסוף המשפט, לפתיחת פתח לתקווה.',
+  'הקשבה לחבר/ה מסייעת לו להתחבר לכוחות שבו ונותנת תחושות של תקווה.',
+  'מי שסובל, רוצה שיסייעו לו! רמזים אובדניים הם קריאה לעזרה.',
+  'חשוב לא להתעלם משום רמז אובדני, כל רמז מחייב בדיקה והתערבות.',
+  'שיתוף גורם מקצועי במצוקת חבר איננה "הלשנה", אלא הצלת חיים.',
+  'מוטב לאבד חברות מלאבד חבר. אל תהססו לשתף גם אם יש חשש מכעס.',
+  'פניה לעזרה היא עדות לכוח נפשי של הפונה, ולא לחולשה!',
+  'חשוב לא להישאר לבד עם הכאב ולשתף חברים ומבוגרים.',
+  'יש לזכור שתמיד יש מי שמוכן להקשיב ולסייע.',
+  'היכרות עם מקורות סיוע היא תשתית חשובה לשמירה על ביטחון ומוגנות.',
+  'בניית "חלום אישי" גמיש מחזק חיבור לכוחות החיים.',
+  'התנדבות ונתינה לאחר מחזקים תחושת מסוגלות אישית ובונים חוסן נפשי.'
+];
+
+const simulatorData = [
+  {
+    studentMsg: "אני כבר לא יכול יותר... נמאס לי מהכל, בא לי פשוט להיעלם.",
+    options: [
+      { text: "מה קרה? יהיה בסדר, כולנו בתקופה לחוצה עכשיו.", feedback: "❌ לפי החוזר, אסור להניח שהמשבר יחלוף או להקטין את הקושי.", correct: false },
+      { text: "כשאתה אומר שבא לך להיעלם, האם אתה חושב על לפגוע בעצמך?", feedback: "✅ מצוין! (סעיף 6.1.ד: לשאול שאלות ישירות וברורות לגבי הכוונה האובדנית).", correct: true },
+      { text: "אני מיד מתקשר להורים שלך, זה מסוכן מאוד לדבר ככה.", feedback: "⚠️ לפי החוזר, למרות חובת היידוע, חשוב קודם לקיים שיחה ראשונית ולהיות קשוב (QPR).", correct: false }
+    ]
+  },
+  {
+    studentMsg: "כן... לפעמים אני חושב שאולי עדיף לכולם בלעדיי. אני סתם נטל.",
+    options: [
+      { text: "אסור לך לחשוב ככה! יש לך משפחה שאוהבת אותך.", feedback: "❌ שגוי. סעיף 6.1.ד קובע: 'יש להימנע לחלוטין משיפוטיות או הטפות מוסר'.", correct: false },
+      { text: "זה נשמע שאתה סוחב כאב עצום. אתה לא לבד בזה, אנחנו יחד נמצא דרך לעזור.", feedback: "✅ מעולה! (שלב ה-P: לשכנע). לפי החוזר: להעביר מסר שתמיד יש מבוגר שמוכן להקשיב ולעזור.", correct: true },
+      { text: "טוב, אני מפנה אותך ליועצת מיד, היא תדע מה לעשות.", feedback: "⚠️ למרות החובה להפנות (Refer), ניסוח טכני מדי מנוגד להנחיה 'להיות קשוב ולהעניק תמיכה'.", correct: false }
+    ]
+  },
+  {
+    studentMsg: "אני מפחד שההורים שלי יכעסו. הם לא יבינו אותי.",
+    options: [
+      { text: "אני מבין את החשש, אבל המצב מחייב שנדבר איתם. בוא נחשוב יחד איך נספר להם בעדינות ונהיה שם איתך.", feedback: "✅ מושלם! סעיף 6.1.ה קובע: 'שיתוף התלמיד... והסבר אודות החובה ליידע את הוריו מתוך דאגה לשלומו'.", correct: true },
+      { text: "אין ברירה, אלה הנהלים. 'פיקוח נפש דוחה סודיות' ואני חייב לדווח.", feedback: "❌ העיקרון נכון, אך הניסוח טכני. החוזר דורש שיתוף של התלמיד בתהליך מתוך דאגה, ולא בכפייה מנוכרת.", correct: false }
+    ]
+  }
+];
+
+let currentSimStep = 0;
+
+const annexesData = [
+  {
+    id:'ann1', num:'1', title:'נספח 1 – נושאי הכשרה שנתית', sub:'שומרי סף · רבעון ראשון', color:'#0369a1', bg:'#e0f2fe',
+    items:['זיהוי סימני מצוקה ודגש על התנהגות אובדנית','גורמי סיכון ומשמעות ריבויים','הקניית כלי QPR/RPQ – שאל, שכנע, הפנה','התאמת שיח לאוכלוסיות ולצרכים שונים','מודעות לאוכלוסיות חנ"מ ומצבי סיכון','נהלי יידוע: איום / ניסיון / התאבדות','נהלי התערבות וסיוע במערכת ובקהילה','עידוד תלמידים לשתף איש חינוך במצוקת חבר','חיזוק פנייה לעזרה כחוסן נפשי','גלישה בטוחה ומטה 105 להגנה ברשת','הפרכת מיתוסים ומסרים מחזקים','הכרת גורמי סיוע: ער"ן, סהר, 105 ועוד']
+  },
+  {
+    id:'ann2', num:'2', title:'נספח 2 – ויתור סודיות', sub:'הערכת סיכון · טיפול פרטי', color:'#15803d', bg:'#f0fdf4',
+    text:'הובהר לי כי הצוות החינוכי מודאג ממצבו של בני/ביתי, ולכן ממליץ שיעבור/תעבור הערכת סיכון לאובדנות ויקבל/תקבל טיפול נפשי תומך ומותאם. ניתן לממש במסגרת פרטית.',
+    previewHtml: `<div style="border:1px solid #cbd5e1; padding:16px; border-radius:8px; background:#fff;"><h3 style="text-align:center; margin-bottom:12px; font-size:14px; font-weight:900; color:#1a1a2e;">טופס בקשת הורים לאבחון ולהערכת סיכון וויתור על סודיות</h3><p>אנו החתומים מטה: _______________ (שמות ההורים), מצהירים בזאת כי צוות המסגרת החינוכית שוחח עמנו ויידע אותנו על מצבו של בננו/בתנו.</p><p>הובהר לנו כי הצוות מודאג ממצבו של בננו/בתנו וחושש שהוא/היא נמצא/ת בסיכון לאובדנות.</p><p><strong>אנו מתחייבים בזאת:</strong></p><ol style="margin-right:20px; margin-bottom:12px; padding-right:10px;"><li>לקחת את בננו/בתנו להערכת סיכון לאובדנות ולקבלת טיפול נפשי.</li><li>להעביר לידי המסגרת החינוכית את תוצאות ההערכה והמלצות הטיפול.</li></ol><p>אנו מסכימים ומאשרים לצוות החינוכי להעביר מידע לצוות המטפל ולוותר על סודיות רפואית לצורך כך.</p><hr style="border:none; border-top:1px dashed #cbd5e1; margin:14px 0;"><p style="display:flex; justify-content:space-between; margin-bottom:8px;"><span>חתימת אב: ________</span> <span>חתימת אם: ________</span></p><p>תאריך: ___________</p></div>`,
+    links: [
+      {t:'תצוגה מקדימה', action:'openPreview("ann2")', icon:'preview'},
+      {t:'הורדת טופס בסיסי', l:'https://meyda.education.gov.il/files/hozermankal/ovd-2.docx', icon:'download'}
+    ]
+  },
+  {
+    id:'ann3', num:'3', title:'נספח 3 – הפניה לשפ"ח / מיון', sub:'הערכת סיכון · אירוע אובדני', color:'#b91c1c', bg:'#fff5f5',
+    text:'טופס הפניה מהמסגרת החינוכית לשפ"ח או לחדר מיון לצורך הערכת סיכון, כולל ויתור סודיות. יש לצרף את הטופס לגורם המלווה התלמיד.',
+    previewHtml: `<div style="border:1px solid #cbd5e1; padding:16px; border-radius:8px; background:#fff;"><h3 style="text-align:center; margin-bottom:12px; font-size:14px; font-weight:900; color:#1a1a2e;">הפניה לשירות הפסיכולוגי החינוכי / לחדר מיון</h3><p><strong>אל:</strong> ___________________ (שם הגורם המעריך)</p><p><strong>מאת:</strong> ___________________ (שם המפנה ותפקידו)</p><hr style="border:none; border-top:1px dashed #cbd5e1; margin:12px 0;"><p><strong>פרטי התלמיד/ה:</strong></p><p style="margin-bottom:10px;">שם: _____________ ת.ז: _____________ כיתה: ______</p><p><strong>סיבת ההפניה (תיאור האירוע / התנהגות אובדנית):</strong></p><p style="min-height:30px; border-bottom:1px solid #cbd5e1; margin-bottom:8px;"></p><p style="min-height:20px; border-bottom:1px solid #cbd5e1; margin-bottom:12px;"></p><p><strong>פעולות שננקטו עד כה במסגרת החינוכית:</strong></p><ul style="margin-right:20px; margin-bottom:12px; padding-right:10px;"><li>השגחה רציפה וצמודה מרגע גילוי הסיכון</li><li>יידוע ההורים וזימונם באופן מיידי</li><li>שיחה ראשונית עם התלמיד (שאל, שכנע, הפנה)</li></ul><p style="font-weight:700;">נבקשכם לבצע הערכת סיכון מקיפה ולצייד את ההורים במכתב המלצות להמשך התערבות וטיפול במסגרת החינוכית.</p></div>`,
+    links:[
+      {t:'תצוגה מקדימה', action:'openPreview("ann3")', icon:'preview'},
+      {t:'טופס בסיסי', l:'https://meyda.education.gov.il/files/hozermankal/ovd-3.docx', icon:'download'},
+      {t:'טופס מורחב', l:'https://docs.google.com/document/d/1fo87jCydEGMW3oa1b1D7vryU6nCdD0uAh3L5c74uxAA/edit?usp=sharing', icon:'external'}
+    ]
+  },
+  {
+    id:'ann4', num:'4', title:'נספח 4 – שיחה ראשונה בכיתה', sub:'לאחר התאבדות / ניסיון אובדני', color:'#b45309', bg:'#fffbeb',
+    items:[
+      'מתן מידע אמין וענייני על האירוע',
+      'הקשבה לתלמידים ומענה לכל שאלותיהם',
+      'הימנעות מהאדרה סביב האירוע או המתאבד',
+      'הקשבה לעצב, כעס, דאגה וחרדה - כיוון לעזרה',
+      'המנחה יכול לחלוק רגשותיו – באופן מבוקר',
+      'אווירה של שותפות, תמיכה ורצון לעזור',
+      'הימנעות משיפוטיות – כל רגש מובן, אך התאבדות אינה פתרון',
+      'העברת מסר: התאבדות היא פתרון סופי לבעיה זמנית',
+      'שילוב כלים להתמודדות עם מצוקה אישית וקבוצתית',
+      'חשיבות הפנייה לעזרה – יוזמה וכוח נפשי',
+      'שיתוף מבוגר בכאב של חבר = הצלת חיים, לא הלשנה!',
+      'חיזוק תקווה, חיבור לכוחות החיים, מסרים בוני חוסן',
+      'הנגשת גורמי סיוע: מחנך, יועץ, פסיכולוג, מוקדים'
+    ],
+    links: [{t:'לנספח המלא', l:'https://docs.google.com/document/d/1x-W0OGWplQNCTjpDTUBw2yeBb27MWw6Pgt_JJKRsX9A/edit?usp=sharing', icon:'external'}]
+  },
+  {
+    id:'ann5', num:'5', title:'נספח 5 – טופס דיווח', sub:'למפקח ייעוץ · מדריך יחידת החירום', color:'#7c3aed', bg:'#fdf4ff',
+    text:'היועץ החינוכי ימלא טופס זה מיד לאחר קבלת דיווח על האירוע ויעבירו למפקח על הייעוץ ולמדריך של היחידה להתמודדות במצבי משבר. כולל פרטים ביוגרפיים ותיאור ההתערבות.',
+    previewHtml: `<div style="border:1px solid #cbd5e1; padding:16px; border-radius:8px; background:#fff;"><h3 style="text-align:center; margin-bottom:12px; font-size:14px; font-weight:900; color:#1a1a2e;">טופס דיווח לפיקוח על הייעוץ ולמדריך יחידת החירום</h3><p><strong>פרטי המדווח:</strong> ________________ תפקיד: ____________</p><p>תאריך הדיווח: ____________</p><hr style="border:none; border-top:1px dashed #cbd5e1; margin:12px 0;"><p><strong>סוג האירוע:</strong></p><p style="margin-bottom:12px; line-height:1.8;">☐ איום בהתאבדות &nbsp;&nbsp; ☐ התנהגות אובדנית<br>☐ ניסיון אובדני &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ☐ התאבדות</p><p><strong>פרטי התלמיד/ה:</strong> גיל: _____ כיתה: _____</p><p><strong>תיאור תמציתי של האירוע וגורמי הרקע:</strong></p><p style="min-height:30px; border-bottom:1px solid #cbd5e1; margin-bottom:12px;"></p><p><strong>פעולות ההתערבות שננקטו:</strong></p><ul style="margin-right:20px; margin-bottom:12px; padding-right:10px;"><li>הודעה להורים וזימונם: כן / לא</li><li>הפניה לגורם מטפל בקהילה: _________________</li><li>גורמים מעורבים בביה"ס (מנהל, פסיכולוג, יועץ).</li></ul><p><strong>תוכנית להמשך התערבות ומעקב ארוך טווח:</strong></p><p style="min-height:20px; border-bottom:1px solid #cbd5e1; margin-bottom:4px;"></p></div>`,
+    links: [
+      {t:'תצוגה מקדימה', action:'openPreview("ann5")', icon:'preview'},
+      {t:'הורדת טופס דיווח', l:'https://meyda.education.gov.il/files/hozermankal/ovd-5.docx', icon:'download'}
+    ]
+  },
+  {
+    id:'ann6', num:'6', title:'נספח 6 – מסרים לחיזוק חוסן', sub:'19 מסרים · לשיח עם תלמידים', color:'#5b21b6', bg:'#f5f3ff',
+    items: resilienceMsgs,
+    links: [{t:'לכל המסרים ב-Docs', l:'https://docs.google.com/document/d/15EjyOb6bJderYfAtWe4AMm_mqzDLqNekvpHOEqkA2QM/edit?usp=sharing', icon:'external'}]
+  },
+  {
+    id:'ann7', num:'7', title:'נספח 7 – גורמי סיוע ועזרה', sub:'קווי חירום · מוקדי תמיכה', color:'#1d4ed8', bg:'#eff6ff',
+    items:[
+      '<strong>מד"א:</strong> 101 | <strong>משטרה:</strong> 100',
+      '<strong>קול לכולם:</strong> *6312 (מוקד סיוע משרד החינוך)',
+      '<strong>ער"ן:</strong> 1201 (עזרה נפשית ברשת)',
+      '<strong>מוקד 105:</strong> המטה הלאומי להגנה על ילדים ברשת',
+      '<strong>סהר:</strong> סיוע והקשבה ברשת (sahar.org.il)',
+      '<strong>Yelem:</strong> פורום תמיכה לנוער',
+      '<strong>אל סם:</strong> ייעוץ וטיפול לנוער ולהורים',
+      '<strong>נט"ל:</strong> 1-800-363-363 (נפגעי טראומה ולחץ)'
+    ]
+  },
+  {
+    id:'ann8', num:'8', title:'נספח 8 – חינוך מיוחד', sub:'התאמת התערבות · אוכלוסיות עם מוגבלות', color:'#c2410c', bg:'#fff7ed',
+    items:[
+      'שינוי בהתנהגות שגרתית = הפניה מיידית לאיש מקצוע',
+      'החמרה בעוצמה, תדירות או משך התנהגות מהווה סימן לסיכון',
+      'הדרכת הורים לדווח על שינויים גם מחוץ לשעות הלימוד',
+      'בניית תוכנית מותאמת בצוות רב-מקצועי (פסיכולוג, יועץ, מטפלים)',
+      'לאפשר לצוות מרחב עיבוד אישי וקבוצתי של האירוע'
+    ]
+  },
+  {
+    id:'ann9', num:'9', title:'נספח 9 – מחוננים', sub:'גורמי פגיעות וחוסן ייחודיים', color:'#166534', bg:'#f0fdf4',
+    items:[
+      '<strong>גורמי חוסן:</strong> יכולת פתרון בעיות, סקרנות אינטלקטואלית, חשיבה מוסרית, חוש הומור ותחושת מסוגלות.',
+      '<strong>גורמי פגיעות:</strong> התפתחות א-סינכרונית, נטייה לפרפקציוניזם, רגישות ועוצמות, נבדלות חברתית, ופחד מכישלון.',
+      'ציפיות גבוהות וסביבה שאינה תומכת עלולים להוות גורמי לחץ.'
+    ]
+  },
+  {
+    id:'ann-glossary', num:'📖', title:'כל המושגים המקצועיים', sub:'הגדרות לפי חוזר מנכ"ל 0473', color:'#475569', bg:'#f8fafc', isGlossary:true,
+    items:[
+      {term:'מחשבות אובדניות', em:'(Suicidal Ideation)', def:'יכולות להיות פסיביות (רצון למות/להיעלם), פעילות (מחשבות להרוג את עצמו), או תוכנית קונקרטית ברמת המחשבה בלבד ללא התארגנות מעשית בפועל.'},
+      {term:'כוונה אובדנית', em:'(Intent)', def:'משאלה סובייקטיבית שפגיעה עצמית תגרום למוות.'},
+      {term:'התנהגות אובדנית', def:'מעשים המעידים על כוונת התאבדות — כל דבר מעשי מעבר למחשבה: היערכות עם אמצעי ספציפי (רכישת כדורים, הכנת חבל), התארגנות לקראת התאבדות (חלוקת חפצים, כתיבת מכתב).'},
+      {term:'ניסיון אובדני', def:'מעשה של פגיעה עצמית שבה מתקיים לפחות רצון מסוים למות. אינו מחייב נזק בפועל — עצם האפשרות לפגיעה היא חלק מההגדרה.'},
+      {term:'ניסיון שסוכל', em:'(Aborted)', def:'ניסיון שהופסק על ידי נסיבות חיצוניות.'},
+      {term:'ניסיון שנזנח', em:'(Disrupted)', def:'ניסיון שהופסק על ידי האדם עצמו.'},
+      {term:'קטלניות', em:'(Lethality)', def:'מידת הסכנה לחיים בשל הניסיון האובדני. קטלניות עלולה להיות פוטנציאלית לאובדנות גם ללא נזק רפואי ממשי.'},
+      {term:'פגיעה עצמית לא אובדנית', em:'(NSSI)', def:'פגיעה עצמית מכוונת ללא כל כוונה למות. מחייב הערכה לשלילת כוונה סמויה.'},
+      {term:'התאבדות', em:'(Suicide)', def:'פעולה שבה אדם שם קץ לחייו ומביא למותו בכוונה תחילה. הכוונה יכולה להיות חלקית.'},
+      {term:'סיכון ממשי ומיידי', def:'מצבים שבהם קיימת סכנת חיים, אשר אינם ניתנים להתמודדות במסגרת השגחת הצוות החינוכי ודורשים מעורבות משטרה.'},
+      {term:'צל"ח', def:'צוות לשעת חירום. מכונס בראשות מפקח מוסד החינוך. הרכב חובה: מנהל השפ"ח/נציגו, מפקח ייעוץ/נציגו, מנהל, יועץ, פסיכולוג.'},
+      {term:'עו"ס פנימייתי', def:'עובד סוציאלי מטעם האגף הפסיכוסוציאלי-רפואי במינהל לחינוך התיישבותי, פנימייתי ועליית הנוער.'},
+      {term:'קב"ס', def:'קצין ביקור סדיר — גורם קישור בין בית הספר לרשויות הרלוונטיות.'},
+      {term:'מנהל מקרה', em:'(Case Manager)', def:'הגורם המקצועי האחראי על המשך ליווי המקרה — נקבע על ידי הצוות הרב-מקצועי ומעדכן את ההורים בתוכנית ההתערבות. (סעיף 7ג לחוזר)'}
+    ]
+  }
+];
+
+// --- הצ'ק ליסטים המלאים והמבוקרים ---
+const checklistScenarios = [
+  { 
+    id:'cl-suspect', label:'חשד לסיכון', color:'#15803d', sections:[
+      { title:'פעולות מיידיות 🔴', items:[
+        {id:'cs1', text:'השגחה מיידית ורציפה עד הגעת ההורים – לא להשאיר לבד!'},
+        {id:'cs2', text:'הרחקת אמצעים מסוכנים (כלי נשק, תרופות) מהישג ידו', warn:true},
+        {id:'cs3', text:'יידוע מנהל המסגרת החינוכית מיד'}
+      ]},
+      { title:'שלב ב - התערבות 🟠', items:[
+        {id:'cs4', text:'היוועצות עם פסיכולוג שפ"ח ומדריכת חירום (לפני השיחה)'},
+        {id:'cs5', text:'שיחה אישית ישירה עם התלמיד (QPR)' + qprBtnHtml},
+        {id:'cs6', text:'יידוע הורים וזימונם המיידי למסגרת החינוכית'}
+      ]},
+      { title:'שלב ג - הערכה ויידוע 🟡', items:[
+        {id:'cs7', text:'הפניית ההורים להערכת סיכון בשפ"ח / מיון (נספח 3)'},
+        {id:'cs8', text:'יועץ ← יידוע מפקח על הייעוץ'},
+        {id:'cs9', text:'מנהל ← יידוע מפקח כולל'}
+      ]},
+      { title:'תיעוד 📋', items:[
+        {id:'cs10', text:'תיעוד מלא וחסוי בכתב של כל מהלך ההתערבות', warn:true}
+      ]}
+    ]
+  },
+  { 
+    id:'cl-threat', label:'איום בהתאבדות', color:'#15803d', sections:[
+      { title:'פעולות מיידיות 🔴', items:[
+        {id:'ct1', text:'השגחה מיידית ורציפה על ידי מבוגר המוכר לתלמיד'},
+        {id:'ct2', text:'בחינת צורך בדיווח למשטרה (במצב סכנת חיים ממשי ומיידי)'},
+        {id:'ct3', text:'הרחקת אמצעים מסוכנים ובקשה מההורים להרחיק בבית', warn:true}
+      ]},
+      { title:'שלב ב - התערבות 🟠', items:[
+        {id:'ct4', text:'יידוע מנהל ופסיכולוג המסגרת מיד'},
+        {id:'ct5', text:'היוועצות עם פסיכולוג שפ"ח ומדריכת חירום (טרם השיחה)'},
+        {id:'ct6', text:'שיחה אישית ישירה עם התלמיד (QPR)' + qprBtnHtml},
+        {id:'ct7', text:'זימון הורים מיידי למסגרת החינוכית'}
+      ]},
+      { title:'שלב ג - הערכה ויידוע 🟡', items:[
+        {id:'ct8', text:'הפניית ההורים להערכת סיכון בשפ"ח / מיון (נספח 3)'},
+        {id:'ct9', text:'יועץ ← יידוע מפקח על הייעוץ'},
+        {id:'ct10', text:'מנהל ← יידוע מפקח כולל'}
+      ]},
+      { title:'תיעוד 📋', items:[
+        {id:'ct11', text:'תיעוד מלא וחסוי בכתב של כל מהלך ההתערבות', warn:true}
+      ]}
+    ]
+  },
+  { 
+    id:'cl-attempt', label:'ניסיון אובדני', color:'#15803d', sections:[
+      { title:'מיידי - באירוע במסגרת 🔴', items:[
+        {id:'ca1', text:'הזמנת מד"א (101) ומשטרה (100) ובידוד הזירה'},
+        {id:'ca2', text:'זימון הורים והשגחה צמודה עד הגעתם'},
+        {id:'ca3', text:'הפניה למיון רפואי/פסיכיאטרי ומסירת טופס אירוע (נספח 3)'}
+      ]},
+      { title:'שרשרת יידוע נרחבת 🟠', items:[
+        {id:'ca4', text:'מנהל ← דיווח למפקח כולל'},
+        {id:'ca5', text:'יועץ ← היוועצות שפ"ח ודיווח למדריכת חירום שפ"י'},
+        {id:'ca6', text:'מנהל שפ"ח ← דיווח לפסיכולוג מחוזי'},
+        {id:'ca7', text:'מנהל מחוז ← עדכון מנכ"ל המשרד (בפציעה/אשפוז)', warn:true}
+      ]},
+      { title:'היערכות ארוכת טווח (סעיף 7) 🟡', items:[
+        {id:'ca8', text:'מינוי צוות רב-מקצועי בראשות המפקח הכולל'},
+        {id:'ca9', text:'מינוי "מנהל מקרה" (Case Manager) לליווי המקרה'},
+        {id:'ca10', text:'מילוי ושליחת טופס דיווח לפיקוח (נספח 5)', warn:true}
+      ]}
+    ]
+  },
+  { 
+    id:'cl-return', label:'חזרה מאשפוז', color:'#15803d', sections:[
+      { title:'טרום חזרה לכיתה 🔵', items:[
+        {id:'cr1', text:'כינוס צוות רב-מקצועי בית-ספרי לגיבוש הליווי'},
+        {id:'cr2', text:'קבלת המלצות ההערכה הפסיכיאטרית מההורים'},
+        {id:'cr3', text:'ישיבת מעבר מקדימה: צוות + הורים + גורם מטפל'},
+        {id:'cr4', text:'מינוי "מנהל מקרה" שילווה את התלמיד'}
+      ]},
+      { title:'תוכנית ליווי 🟢', items:[
+        {id:'cr5', text:'תיאום מול גורמי הטיפול בקהילה'},
+        {id:'cr6', text:'הגדרת התאמות לימודיות ורגשיות'},
+        {id:'cr7', text:'בניית תוכנית פסיכו-חינוכית מותאמת'}
+      ]},
+      { title:'תיעוד ומעקב 📋', items:[
+        {id:'cr8', text:'עדכון הורים בתוכנית ההתערבות'},
+        {id:'cr9', text:'תיעוד התוכנית והמעקבים בתיק התלמיד', warn:true}
+      ]}
+    ]
+  },
+  { 
+    id:'cl-suicide', label:'התאבדות תלמיד', color:'#15803d', sections:[
+      { title:'מיידי 🔴', items:[
+        {id:'cu1', text:'בתוך המוסד: בידוד זירה וקריאה למד"א, משטרה והורים'},
+        {id:'cu2', text:'יידוע פסיכולוג, יועץ, מפקח כולל ומפקח ייעוץ'},
+        {id:'cu3', text:'היוועצות טיפולית טרם יידוע כלל צוות המורים'}
+      ]},
+      { title:'שרשרת יידוע 🟠', items:[
+        {id:'cu4', text:'מנהל ← מחלקת חינוך ברשות ומחלקת רווחה'},
+        {id:'cu5', text:'יועץ ← מפקח ייעוץ ← ממונה מניעת אובדנות בשפ"י'},
+        {id:'cu6', text:'מנהל מחוז ← עדכון מנכ"ל המשרד', warn:true}
+      ]},
+      { title:'פעולות הצל"ח (צוות לשעת חירום) 🟡', items:[
+        {id:'cu7', text:'הגעת מפקח כולל ומפקח ייעוץ למסגרת החינוכית'},
+        {id:'cu8', text:'כינוס צל"ח ומיפוי מעגלי חשיפה ופגיעות'},
+        {id:'cu9', text:'מינוי איש קשר קבוע מטעם המוסד למשפחת המנוח'},
+        {id:'cu10', text:'מפגשי הדרכה, ליווי ותמיכה לצוות המורים'},
+        {id:'cu11', text:'כינוס צל"ח להמשך תכנון - לא יאוחר מ-10 ימים', warn:true}
+      ]}
+    ]
+  },
+  { 
+    id:'cl-followup', label:'מעקב ארוך טווח', color:'#15803d', sections:[
+      { title:'מסגרת המעקב 🗓️', items:[
+        {id:'cf1', text:'וידוא הגעה להערכת סיכון אובדני'},
+        {id:'cf2', text:'קבלת המלצות הגורם המקצועי ושמירתן בתיק החסוי'},
+        {id:'cf3', text:'קיום לפחות 3 שיחות מעקב לאורך השנה'}
+      ]},
+      { title:'תוכנית ליווי 🟢', items:[
+        {id:'cf4', text:'הפעלת תוכנית פסיכו-חינוכית מותאמת'},
+        {id:'cf5', text:'קשר רציף עם גורמי הטיפול בקהילה'}
+      ]},
+      { title:'העברה ⚠️', items:[
+        {id:'cf6', text:'מעבר מוסד: קבלת אישור הורים בכתב להעברת מידע', warn:true},
+        {id:'cf7', text:'מעבר מוסד: דיווח רק לאחר החלטת צוות בין-מקצועי', warn:true}
+      ]},
+      { title:'תיעוד שוטף 📋', items:[
+        {id:'cf8', text:'תועדו כל שיחות המעקב ושינויי המצב', warn:true}
+      ]}
+    ]
+  }
+];
+
+let currentTab = 'navigator';
+let navHistory = [];
+let currentScreen = 'home';
+let clActiveScenario = 'cl-suspect';
+let clChecksData = JSON.parse(sessionStorage.getItem('cl_checks') || '{}');
+
+function init() {
+  buildQPR();
+  buildResilience();
+  buildDocs();
+  buildChecklist();
+  renderNav();
+}
+
+function switchTab(tab) {
+  if (tab === 'navigator' && currentTab === 'navigator') {
+    currentScreen = 'home';
+    navHistory = [];
+    renderNav();
+  }
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+
+  ['docs','prevention','qpr','signs','checklist','navigator', 'rules', 'simulator'].forEach(t => {
+    const btn = document.getElementById('tab-' + t);
+    if (btn) btn.classList.remove('active', 'home-active');
+  });
+
+  const btn = document.getElementById('tab-' + tab);
+  if (btn) {
+    if (tab === 'rules') {
+      btn.classList.add('home-active');
+    } else {
+      btn.classList.add('active');
+    }
+  }
+
+  currentTab = tab;
+  document.getElementById('scroll-area').scrollTop = 0;
+  if (tab === 'checklist') buildChecklist();
+  if (tab === 'simulator') startSimulator();
+}
+
+function goTo(screenId) {
+  navHistory.push(currentScreen);
+  currentScreen = screenId;
+  renderNav();
+  document.getElementById('scroll-area').scrollTop = 0;
+}
+
+function goBack() {
+  if (navHistory.length === 0) return;
+  currentScreen = navHistory.pop();
+  renderNav();
+  document.getElementById('scroll-area').scrollTop = 0;
+}
+
+function generateChecklistHTML(scenarioId) {
+  const s = checklistScenarios.find(x => x.id === scenarioId);
+  if(!s) return '';
+  const all = s.sections.flatMap(x=>x.items);
+  const done = all.filter(i => clChecksData[s.id+'_'+i.id]).length;
+  const pct = all.length ? Math.round(done/all.length*100) : 0;
+
+  let html = `
+    <div class="cl-progress">
+      <span class="cl-progress-text">${done}/${all.length}</span>
+      <div class="cl-progress-bar-wrap">
+        <div class="cl-progress-bar" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+    
+  s.sections.forEach(sec => {
+    html += `<div class="cl-section"><div class="cl-section-title">${sec.title}</div>`;
+    sec.items.forEach(i => {
+      const k = s.id+'_'+i.id; const ch = !!clChecksData[k];
+      html += `<div class="cl-item-row ${ch?'is-checked':''} ${i.warn&&!ch?'is-warn':''}" onclick="toggleCLPro('${k}', ${!!i.warn})">
+        <div class="cl-item-text-col">
+          ${i.warn&&!ch?'<div class="cl-warn-badge">⚠️ חשוב לתעד</div>':''}
+          <div class="cl-item-title">${i.text}</div>
+        </div>
+        <div class="cl-item-checkbox">${ch?'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  });
+
+  if (done === all.length && all.length > 0) {
+    html += `<div class="cl-complete"><div style="font-size:22px;margin-bottom:4px;">✅</div><div style="font-weight:900;color:#065f46;font-size:14px;">כל השלבים בוצעו!</div></div>`;
+  }
+  return html;
+}
+
+function renderNav() {
+  const el = document.getElementById('nav-content');
+  const s = screens[currentScreen];
+  if (!s) return;
+
+  let html = '';
+  if (currentScreen !== 'home') {
+    let alertText = s.alert || 'פיקוח נפש דוחה סודיות. נהלי השגחה חלים מיד עם היוודע הסיכון.';
+    html += `<div class="alert-box">
+      <div class="alert-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div><div class="alert-title">${currentScreen === 'int-2-3' ? 'כוונה אובדנית = סיכון גבוה יותר מאמירה.' : 'עקרון מנחה'}</div><div class="alert-text">${alertText}</div></div>
+    </div>`;
+  }
+
+  html += `<div class="nav-header">
+    <div style="display:flex;align-items:center;gap:8px;flex:1;">
+      ${currentScreen !== 'home' ? `<button class="back-btn" onclick="goBack()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>` : ''}
+      <div class="nav-title">${s.title}</div>
+    </div>
+  </div>`;
+
+  if (s.type === 'home') {
+    html += `<button class="emg-btn" onclick="goTo('emg-1-2')">
+      <div class="emg-left">
+        <div class="emg-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <div><div class="emg-title">סכנת חיים מיידית</div><div class="emg-sub">בידוד זירה · מד"א · משטרה</div></div>
+      </div>
+    </button>
+    <div class="tiles-box">
+      <div class="tiles-label">מפת דרכים — בחרי מסלול</div>
+      ${homeTiles.map(t => `<button class="tile-btn" style="background:${t.bg};border:1px solid ${t.color}33;" onclick="goTo('${t.next}')"><div class="tile-left"><span class="tile-num" style="color:${t.color};">${t.num}</span><div><div class="tile-text">${t.label}</div><div class="tile-sub">${t.sub}</div></div></div><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg></button>`).join('')}
+    </div>`;
+  } else if (s.type === 'procedure') {
+    if (s.text) html += `<div class="procedure-desc">${s.text}</div>`;
+    
+    let matchingChecklistId = null;
+    if (currentScreen === 'sus-2-1') matchingChecklistId = 'cl-suspect';
+    else if (currentScreen === 'say-2-2' || currentScreen === 'int-2-3') matchingChecklistId = 'cl-suspect'; 
+    else if (currentScreen === 'thr-2-1') matchingChecklistId = 'cl-threat';
+    else if (currentScreen === 'nssi-2-4') matchingChecklistId = 'cl-suspect'; 
+    else if (currentScreen === 'attempt-7-1') matchingChecklistId = 'cl-attempt';
+    else if (currentScreen === 'att-7-1') matchingChecklistId = 'cl-return';
+    else if (currentScreen === 'sui-8-1') matchingChecklistId = 'cl-suicide';
+    else if (currentScreen === 'lt-6-1') matchingChecklistId = 'cl-followup';
+
+    if (matchingChecklistId) {
+      html += `<div class="checklist-title">פעולות נדרשות:</div>`;
+      html += generateChecklistHTML(matchingChecklistId);
+    } else if (s.checklist) {
+      html += `<div class="checklist-title">פעולות נדרשות:</div>`;
+      s.checklist.forEach(item => {
+        const key = 'nav_' + currentScreen + '_' + item.id;
+        const checked = !!clChecksData[key];
+        html += `<div class="cl-item-row ${checked ? 'is-checked' : ''} ${item.warn && !checked ? 'is-warn' : ''}" onclick="toggleCLPro('${key}', ${!!item.warn})">
+          <div class="cl-item-text-col">
+            ${item.warn && !checked ? '<div class="cl-warn-badge">⚠️ חשוב לתעד</div>' : ''}
+            <div class="cl-item-title">${item.text}</div>
+          </div>
+          <div class="cl-item-checkbox">${checked ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>' : ''}</div>
+        </div>`;
+      });
+    }
+    
+    if (s.next) {
+      if (s.next.id === 'home') {
+        html += `<button class="action-btn" onclick="switchTab('navigator')">${s.next.label}</button>`;
+      } else {
+        html += `<button class="action-btn" onclick="goTo('${s.next.id}')">${s.next.label}</button>`;
+      }
+    }
+  }
+  el.innerHTML = html;
+}
+
+function buildQPR() {
+  const container = document.getElementById('qpr-steps-container');
+  container.innerHTML = qprSteps.map((step, i) => `
+    <div class="qpr-step" style="border-color:${step.bc};">
+      <div class="qpr-head" style="background:${step.bg};">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="qpr-letter" style="background:${step.color};">${step.letter}</div>
+          <div>
+            <div style="font-size:16px;font-weight:900;color:#1a1a2e;">${step.english} – ${step.hebrew}</div>
+            <div style="font-size:11px;color:#666;font-weight:700;margin-top:2px;">מקור: QPR/RPQ – חוזר 0473</div>
+          </div>
+        </div>
+        <div class="qpr-step-num" style="background:${step.color};">שלב ${i+1}</div>
+      </div>
+      <div class="qpr-goal">${step.goal}</div>
+      
+      <button class="qpr-section-btn" onclick="toggleBlock(this)">
+        <div class="qpr-section-label"><div class="qpr-dot" style="background:#22c55e;"></div>מה כן עושים</div>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="qpr-content" style="display:none;background:#f0fdf4;">${step.yes.map(y=>`<div class="qpr-item">• ${y}</div>`).join('')}</div>
+      
+      <button class="qpr-section-btn" onclick="toggleBlock(this)">
+        <div class="qpr-section-label"><div class="qpr-dot" style="background:#ef4444;"></div>מה לא עושים</div>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="qpr-content" style="display:none;">${step.no.map(n=>`<div class="qpr-item" style="color:#ef4444;">• ${n}</div>`).join('')}</div>
+      
+      <button class="qpr-section-btn" style="border-bottom:none;" onclick="toggleBlock(this)">
+        <div class="qpr-section-label"><div class="qpr-dot" style="background:#94a3b8;"></div>הרציונל המקצועי</div>
+        <span class="chevron">▾</span>
+      </button>
+      <div class="qpr-content" style="display:none;background:#f8f8f8;"><div class="qpr-item" style="color:#475569;">${step.rat}</div></div>
+    </div>`).join('');
+}
+
+function buildResilience() {
+  document.getElementById('prevention-resilience-msgs').innerHTML = resilienceMsgs.slice(0,5).map(m => `<div style="padding:6px 0;border-bottom:1px solid #e9d5ff;font-size:13px;font-weight:700;color:#555;">◆ ${m}</div>`).join('');
+}
+
+function buildDocs() {
+  document.getElementById('annex-container-docs').innerHTML = annexesData.map(a => `
+    <div class="annex-card" id="${a.id}">
+      <button class="annex-head" onclick="toggleBlock(this, true)">
+        <div class="annex-num" style="background:${a.bg};color:${a.color};">${a.num}</div>
+        <div class="annex-info"><div class="annex-title">${a.title}</div><div class="annex-sub">${a.sub}</div></div>
+        <span class="ann-chevron">▾</span>
+      </button>
+      <div class="annex-body" style="display:none;">
+        <div class="annex-content">
+          ${a.isGlossary ? a.items.map(i=>`<div class="glossary-item"><span class="glossary-term">${i.term} ${i.em ? `<em>${i.em}</em>` : ''}</span><span class="glossary-def">${i.def}</span></div>`).join('') : ''}
+          ${a.text ? `<div style="font-size:13px;color:#444;line-height:1.6;margin-bottom:12px;font-weight:500;">${a.text}</div>` : ''}
+          ${a.items && !a.isGlossary ? a.items.map(i=>`<div class="annex-item">${i}</div>`).join('') : ''}
+          ${a.links ? `
+            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+              ${a.links.map(l => {
+                const isAction = !!l.action;
+                const tag = isAction ? 'button' : 'a';
+                const target = isAction ? '' : 'target="_blank"';
+                const hrefOrClick = isAction ? `onclick='${l.action}'` : `href="${l.l}"`;
+                
+                let iconSvg = '';
+                if (l.icon === 'download') iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+                else if (l.icon === 'external') iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+                else if (l.icon === 'preview') iconSvg = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+                
+                return `<${tag} ${hrefOrClick} ${target} class="annex-action-btn" style="background:${isAction?'#fff':a.bg}; color:${isAction?'#334155':a.color}; border-color:${isAction?'#cbd5e1':a.color+'40'}; ${isAction?"font-family:'Heebo',sans-serif;":""}">
+                  ${iconSvg}
+                  ${l.t}
+                </${tag}>`;
+              }).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function onSearch(q) {
+  const term = q.trim();
+  const ol = document.getElementById('search-overlay');
+  const cb = document.getElementById('search-clear');
+  cb.style.display = term ? 'block' : 'none';
+  if(!term) { ol.style.display = 'none'; return; }
+  ol.style.display = 'block';
+  
+  const res = searchIndex.filter(i => (i.title+' '+i.sub).includes(term));
+  document.getElementById('search-results').innerHTML = res.length ? res.map(r => `
+    <div class="search-result" onclick="goToResult('${r.tab}')">
+      <span class="search-tag" style="background:${r.tagColor};color:${r.tagText};">${r.tag}</span>
+      <div><div class="search-result-title">${r.title}</div><div class="search-result-sub">${r.sub}</div></div>
+    </div>`).join('') : `<div class="search-empty">לא נמצאו תוצאות.</div>`;
+}
+
+function clearSearch() { document.getElementById('search-input').value=''; onSearch(''); }
+function goToResult(tab) { clearSearch(); switchTab(tab); }
+
+function toggleBlock(btn, isAnnex=false) {
+  const content = btn.nextElementSibling;
+  const chevron = isAnnex ? btn.querySelector('.ann-chevron') : btn.querySelector('.chevron');
+  if(content.style.display==='none'){ content.style.display='block'; chevron.classList.add('open'); }
+  else{ content.style.display='none'; chevron.classList.remove('open'); }
+}
+
+function openPreview(annexId) {
+  const annex = annexesData.find(a => a.id === annexId);
+  if(!annex || !annex.previewHtml) return;
+  
+  document.getElementById('doc-modal-title').innerText = 'תצוגה מקדימה: ' + annex.title;
+  document.getElementById('doc-modal-body').innerHTML = annex.previewHtml;
+  
+  const overlay = document.getElementById('doc-modal-overlay');
+  const modal = document.getElementById('doc-modal');
+  
+  overlay.style.display = 'flex';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      modal.classList.add('show');
+    });
+  });
+}
+
+function closePreview() {
+  const overlay = document.getElementById('doc-modal-overlay');
+  const modal = document.getElementById('doc-modal');
+  
+  modal.classList.remove('show');
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 300);
+}
+
+function buildChecklist() {
+  document.getElementById('scenario-btns').innerHTML = checklistScenarios.map(s => `
+    <button class="scenario-btn ${s.id===clActiveScenario?'active':''}" onclick="selectScenario('${s.id}')">${s.label}</button>`).join('');
+  renderCLContent();
+}
+
+function selectScenario(id) { 
+  clActiveScenario = id; 
+  buildChecklist(); 
+}
+
+function renderCLContent() {
+  document.getElementById('cl-content').innerHTML = generateChecklistHTML(clActiveScenario) + `<button class="cl-reset-btn" onclick="resetCLScenario()">🔄 איפוס תרחיש זה</button>`;
+}
+
+function showCustomToast(msg, isWarn) {
+  const container = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast' + (isWarn ? ' warn' : '');
+  t.innerHTML = isWarn ? `<span>⚠️</span><span>${msg}</span>` : `<span>✓</span><span>${msg}</span>`;
+  container.appendChild(t);
+  requestAnimationFrame(() => { requestAnimationFrame(() => t.classList.add('show')); });
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 300);
+  }, isWarn ? 3000 : 1800);
+}
+
+function toggleCLPro(k, isWarn) { 
+  clChecksData[k] = !clChecksData[k]; 
+  sessionStorage.setItem('cl_checks',JSON.stringify(clChecksData)); 
+  if (clChecksData[k] && isWarn) {
+    showCustomToast('זכורי לתעד בכתב!', true);
+  }
+  
+  if (currentTab === 'checklist') {
+    renderCLContent(); 
+  } else if (currentTab === 'navigator') {
+    renderNav();
+  }
+}
+
+function resetCLScenario() {
+  const scenario = checklistScenarios.find(s => s.id === clActiveScenario);
+  if(!scenario) return;
+  scenario.sections.forEach(s => s.items.forEach(item => {
+    delete clChecksData[scenario.id + '_' + item.id];
+  }));
+  sessionStorage.setItem('cl_checks', JSON.stringify(clChecksData));
+  
+  if (currentTab === 'checklist') {
+    renderCLContent();
+  } else if (currentTab === 'navigator') {
+    renderNav();
+  }
+}
+
+function startSimulator() {
+  currentSimStep = 0;
+  renderSimStep();
+}
+
+function submitFreeText() {
+  const input = document.getElementById('sim-free-text');
+  const text = input.value.trim();
+  if(!text) return;
+  
+  // כאשר המשתמש מזין טקסט חופשי, אנו מספקים משוב אוניברסלי שמחזיר לעקרונות חוזר מנכ"ל
+  const feedback = `<strong>ניסוח עצמאי:</strong> זכרי תמיד את העיקרון (סעיף 6.1): יש להימנע לחלוטין משיפוטיות, להקשיב ולהכיל, ולא לחשוש לשאול ישירות על כוונה אובדנית.`;
+  processSimAnswer(text, feedback, true); // אנו מאפשרים לטקסט חופשי להתקדם לשלב הבא
+}
+
+function renderSimStep() {
+  const container = document.getElementById('chat-container');
+  if (currentSimStep >= simulatorData.length) {
+    container.innerHTML = `
+      <div style="text-align:center; padding:30px 10px;">
+        <div style="font-size:40px; margin-bottom:10px;">🏆</div>
+        <div style="font-size:18px; font-weight:900; color:#15803d; margin-bottom:8px;">הסימולציה הושלמה בהצלחה!</div>
+        <div style="font-size:13px; color:#444; line-height:1.5;">תרגלת מענה ישיר, מכיל ולא שיפוטי. עמדת בכללי חוזר 0473 (סעיף 6).</div>
+        <button onclick="startSimulator()" style="margin-top:20px; padding:10px 20px; border-radius:10px; border:none; background:#e2e8f0; color:#1e293b; font-weight:700; cursor:pointer;">תרגל שוב</button>
+      </div>`;
+    return;
+  }
+
+  const step = simulatorData[currentSimStep];
+  let html = `
+    <div class="chat-header">
+      <div class="chat-avatar">ד'</div>
+      <div><div style="font-size:13px;font-weight:900;color:#1e293b;">דני (תלמיד)</div><div style="font-size:10px;color:#64748b;">מחכה לתשובה...</div></div>
+    </div>
+    <div class="chat-msg chat-student">${step.studentMsg}</div>
+    
+    <div class="chat-options" id="sim-options">
+      ${step.options.map((opt, idx) => `<button class="chat-opt-btn" onclick="handleSimChoice(${idx})">${opt.text}</button>`).join('')}
+    </div>
+    
+    <div class="chat-input-area" id="sim-input-area">
+      <input type="text" id="sim-free-text" class="chat-input-box" placeholder="או כתבי תגובה במילים שלך..." onkeypress="if(event.key==='Enter') submitFreeText()">
+      <button class="chat-send-btn" onclick="submitFreeText()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+    </div>
+  `;
+  container.innerHTML = html;
+}
+
+function processSimAnswer(userText, feedbackHtml, isCorrect) {
+  const optionsDiv = document.getElementById('sim-options');
+  const inputArea = document.getElementById('sim-input-area');
+  
+  inputArea.style.display = 'none'; // הסתרת אזור ההקלדה לאחר מענה
+  
+  optionsDiv.innerHTML = `<div class="chat-msg chat-teacher">${userText}</div>`;
+  
+  const feedbackClass = isCorrect ? 'success' : 'error';
+  const feedbackDiv = document.createElement('div');
+  feedbackDiv.className = `chat-msg chat-feedback ${feedbackClass}`;
+  feedbackDiv.innerHTML = feedbackHtml;
+  optionsDiv.appendChild(feedbackDiv);
+
+  if (isCorrect) {
+    setTimeout(() => {
+      currentSimStep++;
+      renderSimStep();
+    }, 4500); // השהייה מעט ארוכה יותר כדי לאפשר קריאת המשוב
+  } else {
+    const retryBtn = document.createElement('button');
+    retryBtn.innerText = "נסי שוב";
+    retryBtn.style.cssText = "margin-top:8px; padding:6px; background:none; border:none; color:#4f46e5; font-weight:700; cursor:pointer; text-decoration:underline;";
+    retryBtn.onclick = () => renderSimStep();
+    optionsDiv.appendChild(retryBtn);
+  }
+}
+
+function handleSimChoice(idx) {
+  const step = simulatorData[currentSimStep];
+  const choice = step.options[idx];
+  processSimAnswer(choice.text, choice.feedback, choice.correct);
+}
+
+// הפעלה ראשונית של האפליקציה בטעינה (נפתח במסך מפת הדרכים)
+init();
+switchTab('navigator');
+</script>
+</body>
+</html>
